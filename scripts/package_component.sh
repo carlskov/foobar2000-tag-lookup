@@ -39,9 +39,9 @@ cat > "$PLIST_PATH" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>BNDL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>0.1.8</string>
   <key>CFBundleVersion</key>
-  <string>0.1.0</string>
+  <string>0.1.8</string>
 </dict>
 </plist>
 PLIST

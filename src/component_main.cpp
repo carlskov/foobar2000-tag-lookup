@@ -7,12 +7,25 @@
 #include <array>
 #include <cstdio>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
 
 constexpr GUID kMenuCommandGuid =
     {0x7fc620ce, 0x9fd4, 0x4f7f, {0xab, 0x8e, 0x43, 0xac, 0x03, 0x68, 0x52, 0xb2}};
+constexpr GUID kSearchProviderSettingGuid =
+    {0xc1138cbc, 0x6553, 0x4b14, {0xa6, 0xd7, 0x7e, 0x22, 0xc9, 0xde, 0x39, 0x20}};
+constexpr GUID kSearchModeSettingGuid =
+    {0x02a030e9, 0x2ca3, 0x4a9d, {0x83, 0x3e, 0x49, 0x0f, 0x66, 0xd5, 0xbe, 0xb2}};
+constexpr GUID kOverwriteTitleSettingGuid =
+    {0x09d1d2fc, 0x9e24, 0x4528, {0xbc, 0xb8, 0x53, 0x8e, 0x9d, 0x63, 0x54, 0x71}};
+
+cfg_int g_searchProviderSetting(kSearchProviderSettingGuid,
+                                static_cast<int>(taglookup::SearchProvider::MusicBrainz));
+cfg_int g_searchModeSetting(kSearchModeSettingGuid,
+                            static_cast<int>(taglookup::SearchMode::ExactPhrase));
+cfg_bool g_overwriteTitleSetting(kOverwriteTitleSettingGuid, false);
 
 std::string Trim(std::string s) {
   const size_t begin = s.find_first_not_of(" \t\r\n");
@@ -79,6 +92,122 @@ bool TryBuildQueryFromFilename(const metadb_handle_ptr& track, taglookup::Lookup
   return ParseArtistTitle(stem, out);
 }
 
+class ReleaseTagPropagationFilter : public file_info_filter {
+ public:
+  ReleaseTagPropagationFilter(const pfc::list_base_const_t<metadb_handle_ptr>& data,
+                              std::string albumArtist,
+                              const taglookup::TagResult& result,
+                              std::vector<taglookup::TrackInfo> tracks,
+                              bool overwriteTitle)
+      : album_artist_(std::move(albumArtist)), result_(result),
+        tracks_(std::move(tracks)), overwrite_title_(overwriteTitle) {
+    // Pre-build a map from each handle's raw pointer to its position in the selection.
+    // apply_filter receives the same pointer, allowing per-file track resolution.
+    for (size_t i = 0; i < data.get_count(); ++i) {
+      handle_to_index_[data.get_item(i).get_ptr()] = i;
+    }
+  }
+
+  bool apply_filter(metadb_handle_ptr location, t_filestats stats, file_info& info) override {
+    (void)stats;
+
+    bool changed = false;
+
+    auto setIfNonEmpty = [&](const char* field, const std::string& value) {
+      if (value.empty()) {
+        return;
+      }
+      info.meta_set(field, value.c_str());
+      changed = true;
+    };
+
+    // Resolve per-track title and artist based on this file's position in the selection.
+    std::string trackTitle;
+    std::string trackArtist = album_artist_;
+    std::string trackNumber;
+    std::string discNumber;
+    std::string mediaType;
+
+    const auto it = handle_to_index_.find(location.get_ptr());
+    if (it != handle_to_index_.end() && it->second < tracks_.size()) {
+      const auto& track = tracks_[it->second];
+      trackTitle = track.title;
+      trackNumber = track.trackNumber;
+      discNumber = track.discNumber;
+      mediaType = track.mediaType;
+      if (!track.artist.empty()) {
+        trackArtist = track.artist;
+      }
+    }
+
+    setIfNonEmpty("ARTIST", trackArtist);
+    setIfNonEmpty("ALBUM ARTIST", album_artist_);
+    setIfNonEmpty("ALBUM", result_.album);
+    setIfNonEmpty("DATE", result_.date);
+    setIfNonEmpty("LABEL", result_.label);
+    setIfNonEmpty("TRACKNUMBER", trackNumber);
+    setIfNonEmpty("DISCNUMBER", discNumber);
+    setIfNonEmpty("MEDIA", mediaType);
+
+    if (overwrite_title_) {
+      setIfNonEmpty("TITLE", trackTitle);
+    }
+
+    if (!result_.release_id.empty()) {
+      setIfNonEmpty("MUSICBRAINZ_RELEASEID", result_.release_id);
+      setIfNonEmpty("DISCOGS_RELEASE_ID", result_.release_id);
+    }
+
+    return changed;
+  }
+
+ private:
+  std::string album_artist_;
+  taglookup::TagResult result_;
+  std::vector<taglookup::TrackInfo> tracks_;
+  bool overwrite_title_ = false;
+  std::unordered_map<metadb_handle*, size_t> handle_to_index_;
+};
+
+void PropagateTagsToSelection(const pfc::list_base_const_t<metadb_handle_ptr>& data,
+                              const std::string& albumArtist,
+                              const taglookup::TagResult& result,
+                              const std::vector<taglookup::TrackInfo>& tracks,
+                              bool overwriteTitle) {
+  const auto wndParent = core_api::get_main_window();
+  auto filter = fb2k::service_new<ReleaseTagPropagationFilter>(data, albumArtist, result,
+                                                               tracks, overwriteTitle);
+
+  auto notify = fb2k::makeCompletionNotify([](unsigned code) {
+    FB2K_console_formatter() << "Tag propagation finished, code: " << code;
+  });
+
+  const uint32_t flags = metadb_io_v2::op_flag_partial_info_aware;
+  metadb_io_v2::get()->update_info_async(data, filter, wndParent, flags, notify);
+}
+
+taglookup::SearchProvider LoadSearchProviderSetting() {
+  const int value = static_cast<int>(g_searchProviderSetting);
+  if (value == static_cast<int>(taglookup::SearchProvider::Discogs)) {
+    return taglookup::SearchProvider::Discogs;
+  }
+  return taglookup::SearchProvider::MusicBrainz;
+}
+
+taglookup::SearchMode LoadSearchModeSetting() {
+  const int value = static_cast<int>(g_searchModeSetting);
+  if (value == static_cast<int>(taglookup::SearchMode::Tokenized)) {
+    return taglookup::SearchMode::Tokenized;
+  }
+  return taglookup::SearchMode::ExactPhrase;
+}
+
+void StoreLookupSettings(const taglookup::LookupQuery& query) {
+  g_searchProviderSetting = static_cast<int>(query.provider);
+  g_searchModeSetting = static_cast<int>(query.search_mode);
+  g_overwriteTitleSetting = query.overwrite_title_on_propagation;
+}
+
 class ContextTagLookup : public contextmenu_item_simple {
  public:
   unsigned get_num_items() override { return 1; }
@@ -115,6 +244,10 @@ class ContextTagLookup : public contextmenu_item_simple {
       haveSeed = TryBuildQueryFromFilename(track, seed);
     }
 
+    seed.provider = LoadSearchProviderSetting();
+    seed.search_mode = LoadSearchModeSetting();
+    seed.overwrite_title_on_propagation = static_cast<bool>(g_overwriteTitleSetting);
+
     taglookup::TagLookupService service;
     std::string statusMessage;
     taglookup::LookupQuery query;
@@ -127,6 +260,7 @@ class ContextTagLookup : public contextmenu_item_simple {
       }
 
       query = *queryOpt;
+      StoreLookupSettings(query);
       seed = query;
       matches = service.LookupAll(query, 50);
 
@@ -143,19 +277,31 @@ class ContextTagLookup : public contextmenu_item_simple {
 
       const auto& result = matches[*selectedIndex];
 
+      // Fetch the full, ordered tracklist for the selected release in one API call.
+      // This gives us per-track title and artist so each selected file gets its own tags.
+      const taglookup::TracklistResult tracklistResult = service.FetchTracklist(query, result);
+      const std::string albumArtist =
+          tracklistResult.albumArtist.empty() ? result.artist : tracklistResult.albumArtist;
+
+      PropagateTagsToSelection(data, albumArtist, result, tracklistResult.tracks,
+                               query.overwrite_title_on_propagation);
+
       pfc::string_formatter msg;
-      msg << "Selected " << static_cast<unsigned>(*selectedIndex + 1) << " of "
-          << static_cast<unsigned>(matches.size()) << " matches\n\n";
-      msg << "Artist: " << result.artist.c_str() << "\n";
-      msg << "Title: " << result.title.c_str() << "\n";
+      msg << "Applying selected release tags to " << static_cast<unsigned>(data.get_count())
+          << " file(s) in background.\n\n";
+      msg << "Album Artist: " << albumArtist.c_str() << "\n";
       msg << "Album: " << result.album.c_str() << "\n";
+      if (!tracklistResult.tracks.empty()) {
+        msg << "Tracks resolved: " << static_cast<unsigned>(tracklistResult.tracks.size())
+            << " (each file gets its own per-track title/artist)\n";
+      }
       msg << "Label: " << result.label.c_str() << "\n";
       msg << "Date: " << result.date.c_str() << "\n";
-      msg << "Score: " << result.score << "\n\n";
-      msg << "Next step: write these values back through metadb_io_v2."
-             " This starter keeps writes disabled by default.";
+      msg << "Release ID: " << result.release_id.c_str() << "\n";
+      msg << "Overwrite TITLE: "
+          << (query.overwrite_title_on_propagation ? "Yes (per-track)" : "No (kept per-file titles)");
 
-      popup_message::g_show(msg, "Tag Lookup Result");
+      popup_message::g_show(msg, "Tag Lookup: Propagating Tags");
       return;
     }
   }
@@ -180,6 +326,7 @@ class ContextTagLookup : public contextmenu_item_simple {
 
 static contextmenu_item_factory_t<ContextTagLookup> g_context_tag_lookup_factory;
 
-DECLARE_COMPONENT_VERSION("Tag Lookup (mac starter)", "0.1.0", "Looks up tags from MusicBrainz for selected track.");
+DECLARE_COMPONENT_VERSION("Tag Lookup (mac starter)", "0.1.8",
+                          "Looks up online release metadata and propagates tags to selected files.");
 
 }  // namespace

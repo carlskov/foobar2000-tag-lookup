@@ -59,27 +59,33 @@ std::optional<LookupQuery> PromptForLookupQuery(const LookupQuery& seed,
     [alert addButtonWithTitle:@"Search"];
     [alert addButtonWithTitle:@"Cancel"];
 
-    NSView* view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 650, 254)];
+    NSView* view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 650, 310)];
 
-    NSPopUpButton* providerPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(118, 222, 220, 24)
+    NSPopUpButton* providerPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(118, 252, 220, 24)
                                    pullsDown:NO];
     [providerPopup addItemWithTitle:@"MusicBrainz"];
     [providerPopup addItemWithTitle:@"Discogs"];
     [providerPopup selectItemAtIndex:(seed.provider == SearchProvider::Discogs) ? 1 : 0];
 
-    NSTextField* artistInput = MakeInput(ToNSString(seed.artist), 190);
-    NSTextField* titleInput = MakeInput(ToNSString(seed.title), 158);
-    NSTextField* albumInput = MakeInput(ToNSString(seed.album), 126);
-    NSTextField* labelInput = MakeInput(ToNSString(seed.label), 94);
-    NSTextField* yearInput = MakeInput(ToNSString(seed.year), 62);
+    NSTextField* artistInput = MakeInput(ToNSString(seed.artist), 220);
+    NSTextField* titleInput = MakeInput(ToNSString(seed.title), 188);
+    NSTextField* albumInput = MakeInput(ToNSString(seed.album), 156);
+    NSTextField* labelInput = MakeInput(ToNSString(seed.label), 124);
+    NSTextField* yearInput = MakeInput(ToNSString(seed.year), 92);
 
-    NSButton* tokenizedToggle = [[NSButton alloc] initWithFrame:NSMakeRect(118, 32, 520, 24)];
+    NSButton* tokenizedToggle = [[NSButton alloc] initWithFrame:NSMakeRect(118, 56, 520, 24)];
     [tokenizedToggle setButtonType:NSButtonTypeSwitch];
     tokenizedToggle.title = @"Use tokenized broad search (uncheck for exact phrase search)";
     tokenizedToggle.state = (seed.search_mode == SearchMode::Tokenized) ? NSControlStateValueOn
                                        : NSControlStateValueOff;
 
-    NSTextField* statusLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(118, 4, 520, 24)];
+    NSButton* overwriteTitleToggle = [[NSButton alloc] initWithFrame:NSMakeRect(118, 28, 520, 24)];
+    [overwriteTitleToggle setButtonType:NSButtonTypeSwitch];
+    overwriteTitleToggle.title = @"When applying to selection, overwrite TITLE on all files";
+    overwriteTitleToggle.state = seed.overwrite_title_on_propagation ? NSControlStateValueOn
+                                      : NSControlStateValueOff;
+
+    NSTextField* statusLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(118, 2, 520, 24)];
     statusLabel.bezeled = NO;
     statusLabel.drawsBackground = NO;
     statusLabel.editable = NO;
@@ -88,12 +94,12 @@ std::optional<LookupQuery> PromptForLookupQuery(const LookupQuery& seed,
     statusLabel.font = [NSFont systemFontOfSize:12.0];
     statusLabel.stringValue = statusMessage.empty() ? @"" : ToNSString(statusMessage);
 
-    [view addSubview:MakeLabel(@"Provider", 224)];
-    [view addSubview:MakeLabel(@"Artist", 192)];
-    [view addSubview:MakeLabel(@"Track", 160)];
-    [view addSubview:MakeLabel(@"Release", 128)];
-    [view addSubview:MakeLabel(@"Label", 96)];
-    [view addSubview:MakeLabel(@"Year", 64)];
+    [view addSubview:MakeLabel(@"Provider", 254)];
+    [view addSubview:MakeLabel(@"Artist", 222)];
+    [view addSubview:MakeLabel(@"Track", 190)];
+    [view addSubview:MakeLabel(@"Release", 158)];
+    [view addSubview:MakeLabel(@"Label", 126)];
+    [view addSubview:MakeLabel(@"Year", 94)];
     [view addSubview:providerPopup];
     [view addSubview:artistInput];
     [view addSubview:titleInput];
@@ -101,6 +107,7 @@ std::optional<LookupQuery> PromptForLookupQuery(const LookupQuery& seed,
     [view addSubview:labelInput];
     [view addSubview:yearInput];
     [view addSubview:tokenizedToggle];
+    [view addSubview:overwriteTitleToggle];
     [view addSubview:statusLabel];
 
     alert.accessoryView = view;
@@ -118,6 +125,7 @@ std::optional<LookupQuery> PromptForLookupQuery(const LookupQuery& seed,
     query.year = FromNSString(yearInput.stringValue);
     query.search_mode = (tokenizedToggle.state == NSControlStateValueOn) ? SearchMode::Tokenized
                                         : SearchMode::ExactPhrase;
+    query.overwrite_title_on_propagation = (overwriteTitleToggle.state == NSControlStateValueOn);
     query.provider = (providerPopup.indexOfSelectedItem == 1) ? SearchProvider::Discogs
                                   : SearchProvider::MusicBrainz;
 

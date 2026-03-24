@@ -1,20 +1,23 @@
 # foo_taglookup (Foobar2000 macOS starter component)
 
-This is a starter Foobar2000 component project for macOS that adds a context-menu command:
+This is a Foobar2000 component project for macOS that adds a context-menu command:
 
 - `Lookup Tags Online`
 
 The command currently:
 
 1. Opens a query dialog with fields: Provider, Artist, Track, Release, Label, Year.
-2. Lets you toggle search mode: tokenized (broad) or exact phrase (strict).
+2. Defaults to exact phrase search and lets you optionally toggle tokenized (broad) search.
 3. Prefills Artist + Track from clipboard (`Artist - Title`) or filename when possible.
-4. Calls MusicBrainz web API and fetches multiple possible matches.
+4. Calls the selected provider web API and fetches multiple possible matches.
 5. Enforces that every field you filled out must match returned data.
 6. Shows a selectable list of releases.
-7. Uses your selected release and shows the chosen tags in a popup.
+7. Applies the selected release metadata to all selected files.
+8. Can optionally overwrite TITLE for all selected files when enabled in the search dialog.
 
-Writing tags back to files is intentionally left disabled in this starter so you can choose your preferred write strategy and safeguards first.
+Tag propagation currently applies release-level fields across the current selection: artist, album, date, label, and release IDs. It does not force `ALBUM ARTIST`. For Discogs, the component resolves track artist from the selected release details when available. Per-file titles are preserved unless you enable the overwrite-title option.
+
+The dialog remembers the last used provider, search mode, and title-overwrite setting. Search text fields are not persisted.
 
 ## What is included
 
@@ -73,7 +76,7 @@ The current `CMakeLists.txt` builds required foobar2000 SDK static libraries fro
 
 1. Replace filename parsing with real tag extraction from `file_info`.
 2. Add confidence scoring and candidate disambiguation UI.
-3. Implement writeback via `metadb_io_v2` with undo-friendly behavior.
+3. Improve writeback safeguards and track-level mapping behavior.
 4. Add request throttling, retries, and local cache.
 5. Add opt-in providers (Discogs, MusicBrainz release group, etc.).
 
@@ -84,7 +87,8 @@ When a file is badly named, you can still search with the dialog fields.
 1. Optionally copy text in the form `Artist - Title` to clipboard for prefill.
 2. Right-click the track and run `Lookup Tags Online`.
 3. Enter any subset of Artist, Release, Track, Year.
-4. Choose tokenized search for broader results, or exact phrase for tighter results.
+4. Exact phrase search is the default. Enable tokenized search only when you want broader matching.
+5. Enable the title overwrite checkbox only if you want all selected files to get the same TITLE value.
 
 Every field you provide is treated as required for candidate matching.
 
