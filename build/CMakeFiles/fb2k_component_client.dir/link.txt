@@ -1,0 +1,2 @@
+/usr/bin/ar qc libfb2k_component_client.a "CMakeFiles/fb2k_component_client.dir/sdk/foobar2000-sdk-2025-03-07/foobar2000/foobar2000_component_client/component_client.cpp.o"
+/usr/bin/ranlib libfb2k_component_client.a

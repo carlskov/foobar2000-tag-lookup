@@ -1,0 +1,9 @@
+/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles/fb2k_pfc.dir
+/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles/fb2k_shared.dir
+/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles/fb2k_sdk.dir
+/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles/fb2k_component_client.dir
+/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles/foo_taglookup.dir
+/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles/edit_cache.dir
+/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles/rebuild_cache.dir
+/Users/jesthuecarlskov/code/fb2k/build/_deps/nlohmann_json-build/CMakeFiles/edit_cache.dir
+/Users/jesthuecarlskov/code/fb2k/build/_deps/nlohmann_json-build/CMakeFiles/rebuild_cache.dir

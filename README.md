@@ -1,0 +1,89 @@
+# foo_taglookup (Foobar2000 macOS starter component)
+
+This is a starter Foobar2000 component project for macOS that adds a context-menu command:
+
+- `Lookup Tags Online`
+
+The command currently:
+
+1. Checks clipboard for manual search term in format `Artist - Title`.
+2. If clipboard is not usable, reads selected track filename (expects `Artist - Title.ext`).
+3. Calls MusicBrainz web API.
+4. Shows candidate tags in a popup.
+
+Writing tags back to files is intentionally left disabled in this starter so you can choose your preferred write strategy and safeguards first.
+
+## What is included
+
+- C++20 component skeleton (`src/component_main.cpp`)
+- Web lookup service with `libcurl` + JSON parsing (`src/tag_lookup_service.cpp`)
+- CMake project setup for Xcode generation (`CMakeLists.txt`)
+
+## Prerequisites
+
+- Xcode / Command Line Tools
+- CMake 3.21+
+- foobar2000 SDK extracted locally
+- Internet access for metadata queries
+
+## Build (macOS)
+
+```bash
+cmake -S . -B build
+cmake --build build --config Release
+```
+
+If you have full Xcode installed and want an Xcode project:
+
+```bash
+cmake -S . -B build-xcode -G Xcode
+cmake --build build-xcode --config Release
+```
+
+## Package as .component (macOS)
+
+After building, create an installable bundle:
+
+```bash
+./scripts/package_component.sh
+```
+
+This creates:
+
+- `dist/foo_taglookup.component`
+
+Install it by copying to:
+
+- `~/Library/Application Support/foobar2000-v2/components`
+
+If your SDK is not at `sdk/foobar2000-sdk-*`, pass it explicitly:
+
+```bash
+cmake -S . -B build -G Xcode -DFOOBAR2000_SDK_ROOT=/absolute/path/to/foobar2000-sdk
+```
+
+## Important SDK linkage note
+
+The current `CMakeLists.txt` builds required foobar2000 SDK static libraries from your local SDK source tree and links them automatically.
+
+## Recommended next steps
+
+1. Replace filename parsing with real tag extraction from `file_info`.
+2. Add confidence scoring and candidate disambiguation UI.
+3. Implement writeback via `metadb_io_v2` with undo-friendly behavior.
+4. Add request throttling, retries, and local cache.
+5. Add opt-in providers (Discogs, MusicBrainz release group, etc.).
+
+## Manual search usage
+
+When a file is badly named, you can still search:
+
+1. Copy text in the form `Artist - Title` to clipboard.
+2. Right-click the track and run `Lookup Tags Online`.
+
+If the clipboard term is valid, it takes priority over filename parsing.
+
+## Legal / API usage
+
+- Follow MusicBrainz API usage policy and include a real contact URL in the user-agent.
+- Respect provider terms, rate limits, and attribution requirements.

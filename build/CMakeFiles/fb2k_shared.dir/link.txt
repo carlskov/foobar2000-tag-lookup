@@ -1,0 +1,2 @@
+/usr/bin/ar qc libfb2k_shared.a "CMakeFiles/fb2k_shared.dir/sdk/foobar2000-sdk-2025-03-07/foobar2000/shared/audio_math.cpp.o" "CMakeFiles/fb2k_shared.dir/sdk/foobar2000-sdk-2025-03-07/foobar2000/shared/shared-nix.cpp.o" "CMakeFiles/fb2k_shared.dir/sdk/foobar2000-sdk-2025-03-07/foobar2000/shared/stdafx.cpp.o" "CMakeFiles/fb2k_shared.dir/sdk/foobar2000-sdk-2025-03-07/foobar2000/shared/utf8.cpp.o" "CMakeFiles/fb2k_shared.dir/sdk/foobar2000-sdk-2025-03-07/foobar2000/shared/shared-apple.mm.o"
+/usr/bin/ranlib libfb2k_shared.a
