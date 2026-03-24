@@ -394,6 +394,38 @@ std::string ExtractDiscNumberFromDiscogsPosition(const std::string& position) {
   return "";
 }
 
+std::string JoinJsonStringArray(const nlohmann::json& arr) {
+  if (!arr.is_array() || arr.empty()) {
+    return "";
+  }
+
+  std::string out;
+  for (const auto& item : arr) {
+    if (!item.is_string()) {
+      continue;
+    }
+    const std::string value = Trim(item.get<std::string>());
+    if (value.empty()) {
+      continue;
+    }
+    if (!out.empty()) {
+      out += "; ";
+    }
+    out += value;
+  }
+
+  return out;
+}
+
+int ParsePositiveInt(const std::string& text) {
+  try {
+    const int v = std::stoi(text);
+    return v > 0 ? v : 0;
+  } catch (...) {
+    return 0;
+  }
+}
+
 const nlohmann::json* FindMatchingDiscogsTrack(const nlohmann::json& release,
                                                const std::string& wantedTitle) {
   if (!release.contains("tracklist") || !release["tracklist"].is_array()) {
@@ -796,6 +828,20 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
     if (query.provider == SearchProvider::Discogs) {
       // Album-level artist.
       out.albumArtist = ExtractDiscogsReleaseArtist(json);
+      out.genre = JoinJsonStringArray(json.value("genres", nlohmann::json::array()));
+      if (out.genre.empty()) {
+        out.genre = JoinJsonStringArray(json.value("styles", nlohmann::json::array()));
+      }
+
+      int totalDiscs = 0;
+      if (json.contains("formats") && json["formats"].is_array()) {
+        for (const auto& fmt : json["formats"]) {
+          const int qty = ParsePositiveInt(JsonFieldToString(fmt, "qty"));
+          if (qty > 0) {
+            totalDiscs += qty;
+          }
+        }
+      }
 
       // Per-track data from tracklist[].
       const std::string releaseMediaType = ExtractDiscogsMediaType(json);
@@ -825,13 +871,32 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
           ++trackOrdinal;
         }
       }
+
+      out.totalTracks = std::to_string(out.tracks.size());
+      if (totalDiscs <= 0) {
+        int maxDisc = 0;
+        for (const auto& track : out.tracks) {
+          const int dn = ParsePositiveInt(track.discNumber);
+          if (dn > maxDisc) {
+            maxDisc = dn;
+          }
+        }
+        totalDiscs = maxDisc;
+      }
+      if (totalDiscs > 0) {
+        out.totalDiscs = std::to_string(totalDiscs);
+      }
     } else {
       // MusicBrainz album-level artist.
       out.albumArtist = ExtractPrimaryArtist(json);
+      if (json.contains("tags") && json["tags"].is_array() && !json["tags"].empty()) {
+        out.genre = json["tags"][0].value("name", "");
+      }
 
       // Per-track data from media[].tracks[].
       if (json.contains("media") && json["media"].is_array()) {
         size_t mediumOrdinal = 1;
+        out.totalDiscs = std::to_string(json["media"].size());
         for (const auto& medium : json["media"]) {
           const std::string mediaType = medium.value("format", "");
           std::string discNumber;
@@ -874,6 +939,8 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
           ++mediumOrdinal;
         }
       }
+
+      out.totalTracks = std::to_string(out.tracks.size());
     }
   } catch (...) {
   }

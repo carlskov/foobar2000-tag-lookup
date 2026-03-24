@@ -96,10 +96,14 @@ class ReleaseTagPropagationFilter : public file_info_filter {
  public:
   ReleaseTagPropagationFilter(const pfc::list_base_const_t<metadb_handle_ptr>& data,
                               std::string albumArtist,
+                              std::string totalTracks,
+                              std::string totalDiscs,
+                              std::string genre,
                               const taglookup::TagResult& result,
                               std::vector<taglookup::TrackInfo> tracks,
                               bool overwriteTitle)
-      : album_artist_(std::move(albumArtist)), result_(result),
+      : album_artist_(std::move(albumArtist)), total_tracks_(std::move(totalTracks)),
+        total_discs_(std::move(totalDiscs)), genre_(std::move(genre)), result_(result),
         tracks_(std::move(tracks)), overwrite_title_(overwriteTitle) {
     // Pre-build a map from each handle's raw pointer to its position in the selection.
     // apply_filter receives the same pointer, allowing per-file track resolution.
@@ -145,6 +149,9 @@ class ReleaseTagPropagationFilter : public file_info_filter {
     setIfNonEmpty("ALBUM", result_.album);
     setIfNonEmpty("DATE", result_.date);
     setIfNonEmpty("LABEL", result_.label);
+    setIfNonEmpty("TOTALTRACKS", total_tracks_);
+    setIfNonEmpty("TOTALDISCS", total_discs_);
+    setIfNonEmpty("GENRE", genre_);
     setIfNonEmpty("TRACKNUMBER", trackNumber);
     setIfNonEmpty("DISCNUMBER", discNumber);
     setIfNonEmpty("MEDIA", mediaType);
@@ -163,6 +170,9 @@ class ReleaseTagPropagationFilter : public file_info_filter {
 
  private:
   std::string album_artist_;
+  std::string total_tracks_;
+  std::string total_discs_;
+  std::string genre_;
   taglookup::TagResult result_;
   std::vector<taglookup::TrackInfo> tracks_;
   bool overwrite_title_ = false;
@@ -171,12 +181,16 @@ class ReleaseTagPropagationFilter : public file_info_filter {
 
 void PropagateTagsToSelection(const pfc::list_base_const_t<metadb_handle_ptr>& data,
                               const std::string& albumArtist,
+                              const std::string& totalTracks,
+                              const std::string& totalDiscs,
+                              const std::string& genre,
                               const taglookup::TagResult& result,
                               const std::vector<taglookup::TrackInfo>& tracks,
                               bool overwriteTitle) {
   const auto wndParent = core_api::get_main_window();
-  auto filter = fb2k::service_new<ReleaseTagPropagationFilter>(data, albumArtist, result,
-                                                               tracks, overwriteTitle);
+  auto filter = fb2k::service_new<ReleaseTagPropagationFilter>(data, albumArtist, totalTracks,
+                                                               totalDiscs, genre, result, tracks,
+                                                               overwriteTitle);
 
   auto notify = fb2k::makeCompletionNotify([](unsigned code) {
     FB2K_console_formatter() << "Tag propagation finished, code: " << code;
@@ -283,7 +297,9 @@ class ContextTagLookup : public contextmenu_item_simple {
       const std::string albumArtist =
           tracklistResult.albumArtist.empty() ? result.artist : tracklistResult.albumArtist;
 
-      PropagateTagsToSelection(data, albumArtist, result, tracklistResult.tracks,
+        PropagateTagsToSelection(data, albumArtist, tracklistResult.totalTracks,
+                     tracklistResult.totalDiscs, tracklistResult.genre,
+                     result, tracklistResult.tracks,
                                query.overwrite_title_on_propagation);
 
       pfc::string_formatter msg;
@@ -291,6 +307,9 @@ class ContextTagLookup : public contextmenu_item_simple {
           << " file(s) in background.\n\n";
       msg << "Album Artist: " << albumArtist.c_str() << "\n";
       msg << "Album: " << result.album.c_str() << "\n";
+      msg << "Genre: " << tracklistResult.genre.c_str() << "\n";
+      msg << "Total tracks: " << tracklistResult.totalTracks.c_str() << "\n";
+      msg << "Total discs: " << tracklistResult.totalDiscs.c_str() << "\n";
       if (!tracklistResult.tracks.empty()) {
         msg << "Tracks resolved: " << static_cast<unsigned>(tracklistResult.tracks.size())
             << " (each file gets its own per-track title/artist)\n";
@@ -326,7 +345,7 @@ class ContextTagLookup : public contextmenu_item_simple {
 
 static contextmenu_item_factory_t<ContextTagLookup> g_context_tag_lookup_factory;
 
-DECLARE_COMPONENT_VERSION("Tag Lookup (mac starter)", "0.1.8",
+DECLARE_COMPONENT_VERSION("Tag Lookup (mac starter)", "0.1.9",
                           "Looks up online release metadata and propagates tags to selected files.");
 
 }  // namespace
