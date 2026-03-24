@@ -113,6 +113,7 @@ target_link_libraries(fb2k_component_client PUBLIC fb2k_sdk fb2k_shared fb2k_pfc
 add_library(foo_taglookup SHARED
   src/component_main.cpp
   src/match_selector_mac.mm
+  src/search_input_mac.mm
   src/tag_lookup_service.cpp
 )
 

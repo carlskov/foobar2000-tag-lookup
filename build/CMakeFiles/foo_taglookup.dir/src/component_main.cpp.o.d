@@ -1107,4 +1107,5 @@ CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o: \
   /Users/jesthuecarlskov/code/fb2k/sdk/foobar2000-sdk-2025-03-07/foobar2000/SDK/toolbarDropDown.h \
   /Users/jesthuecarlskov/code/fb2k/sdk/foobar2000-sdk-2025-03-07/foobar2000/SDK/ui_element_mac.h \
   /Users/jesthuecarlskov/code/fb2k/src/match_selector.h \
-  /Users/jesthuecarlskov/code/fb2k/src/tag_lookup_service.h
+  /Users/jesthuecarlskov/code/fb2k/src/tag_lookup_service.h \
+  /Users/jesthuecarlskov/code/fb2k/src/search_input.h

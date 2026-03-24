@@ -1,11 +1,13 @@
 #include <foobar2000/SDK/foobar2000.h>
 
 #include "match_selector.h"
+#include "search_input.h"
 #include "tag_lookup_service.h"
 
 #include <array>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -95,58 +97,67 @@ class ContextTagLookup : public contextmenu_item_simple {
 
     (void)caller;
 
-    // Minimal starter behavior:
-    // 1) Try manual search term from clipboard: "Artist - Title".
-    // 2) Fallback to parsing "Artist - Title" from filename.
-    // 3) Lookup tags using MusicBrainz web API.
-    // 4) Show result in popup.
+    // Query behavior:
+    // 1) Build defaults from clipboard / filename.
+    // 2) Ask user for artist/release/track/year input.
+    // 3) Lookup tags using MusicBrainz web API, matching all filled fields.
+    // 4) Let user choose release from candidates.
     const metadb_handle_ptr track = data.get_item(0);
 
-    taglookup::LookupQuery query;
+    taglookup::LookupQuery seed;
     const std::string clipboardText = TryReadClipboardArtistTitle();
 
-    bool haveQuery = false;
+    bool haveSeed = false;
     if (!clipboardText.empty()) {
-      haveQuery = ParseArtistTitle(clipboardText, query);
+      haveSeed = ParseArtistTitle(clipboardText, seed);
     }
-    if (!haveQuery) {
-      haveQuery = TryBuildQueryFromFilename(track, query);
-    }
-    if (!haveQuery) {
-      popup_message::g_show(
-          "Provide a manual search term by copying \"Artist - Title\" to clipboard, or rename file as Artist - Title.ext.",
-          "Tag Lookup");
-      return;
+    if (!haveSeed) {
+      haveSeed = TryBuildQueryFromFilename(track, seed);
     }
 
     taglookup::TagLookupService service;
-    const auto matches = service.LookupAll(query, 200);
+    std::string statusMessage;
+    taglookup::LookupQuery query;
+    std::vector<taglookup::TagResult> matches;
 
-    if (matches.empty()) {
-      popup_message::g_show("No tag match found online.", "Tag Lookup");
+    while (true) {
+      const auto queryOpt = taglookup::PromptForLookupQuery(seed, statusMessage);
+      if (!queryOpt.has_value()) {
+        return;
+      }
+
+      query = *queryOpt;
+      seed = query;
+      matches = service.LookupAll(query, 50);
+
+      if (matches.empty()) {
+        statusMessage = "No results found. Adjust fields and try again.";
+        continue;
+      }
+
+      const auto selectedIndex = taglookup::SelectTagResultIndex(query, matches);
+      if (!selectedIndex.has_value()) {
+        statusMessage = "Selection canceled. You can refine and search again.";
+        continue;
+      }
+
+      const auto& result = matches[*selectedIndex];
+
+      pfc::string_formatter msg;
+      msg << "Selected " << static_cast<unsigned>(*selectedIndex + 1) << " of "
+          << static_cast<unsigned>(matches.size()) << " matches\n\n";
+      msg << "Artist: " << result.artist.c_str() << "\n";
+      msg << "Title: " << result.title.c_str() << "\n";
+      msg << "Album: " << result.album.c_str() << "\n";
+      msg << "Label: " << result.label.c_str() << "\n";
+      msg << "Date: " << result.date.c_str() << "\n";
+      msg << "Score: " << result.score << "\n\n";
+      msg << "Next step: write these values back through metadb_io_v2."
+             " This starter keeps writes disabled by default.";
+
+      popup_message::g_show(msg, "Tag Lookup Result");
       return;
     }
-
-    const auto selectedIndex = taglookup::SelectTagResultIndex(query, matches);
-    if (!selectedIndex.has_value()) {
-      popup_message::g_show("Lookup canceled.", "Tag Lookup");
-      return;
-    }
-
-    const auto& result = matches[*selectedIndex];
-
-    pfc::string_formatter msg;
-    msg << "Selected " << static_cast<unsigned>(*selectedIndex + 1) << " of "
-        << static_cast<unsigned>(matches.size()) << " matches\n\n";
-    msg << "Artist: " << result.artist.c_str() << "\n";
-    msg << "Title: " << result.title.c_str() << "\n";
-    msg << "Album: " << result.album.c_str() << "\n";
-    msg << "Date: " << result.date.c_str() << "\n";
-    msg << "Score: " << result.score << "\n\n";
-    msg << "Next step: write these values back through metadb_io_v2."
-           " This starter keeps writes disabled by default.";
-
-    popup_message::g_show(msg, "Tag Lookup Result");
   }
 
   GUID get_item_guid(unsigned index) override {

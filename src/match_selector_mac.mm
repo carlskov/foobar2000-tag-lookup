@@ -15,9 +15,10 @@ NSString* BuildItemLabel(const TagResult& item) {
   NSString* artist = item.artist.empty() ? @"?" : ToNSString(item.artist);
   NSString* title = item.title.empty() ? @"?" : ToNSString(item.title);
   NSString* album = item.album.empty() ? @"Unknown album" : ToNSString(item.album);
+  NSString* label = item.label.empty() ? @"Unknown label" : ToNSString(item.label);
   NSString* date = item.date.empty() ? @"Unknown date" : ToNSString(item.date);
-  return [NSString stringWithFormat:@"%@ - %@ | %@ (%@) [score %d]", artist, title, album, date,
-                                    item.score];
+  return [NSString stringWithFormat:@"%@ - %@ | %@ | %@ (%@) [score %d]", artist, title, album,
+                                    label, date, item.score];
 }
 
 }  // namespace
@@ -32,11 +33,14 @@ std::optional<size_t> SelectTagResultIndex(const LookupQuery& query,
     NSAlert* alert = [[NSAlert alloc] init];
     alert.messageText = @"Select Release";
 
-    NSString* artist = query.artist.empty() ? @"?" : ToNSString(query.artist);
-    NSString* title = query.title.empty() ? @"?" : ToNSString(query.title);
+    NSString* artist = query.artist.empty() ? @"*" : ToNSString(query.artist);
+    NSString* title = query.title.empty() ? @"*" : ToNSString(query.title);
+    NSString* album = query.album.empty() ? @"*" : ToNSString(query.album);
+    NSString* label = query.label.empty() ? @"*" : ToNSString(query.label);
+    NSString* year = query.year.empty() ? @"*" : ToNSString(query.year);
     alert.informativeText =
-        [NSString stringWithFormat:@"Found %lu possible matches for %@ - %@.",
-                                   (unsigned long)matches.size(), artist, title];
+      [NSString stringWithFormat:@"Found %lu matches for artist=%@, release=%@, label=%@, track=%@, year=%@.",
+                     (unsigned long)matches.size(), artist, album, label, title, year];
 
     [alert addButtonWithTitle:@"Use Selected Match"];
     [alert addButtonWithTitle:@"Cancel"];

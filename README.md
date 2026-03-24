@@ -6,11 +6,13 @@ This is a starter Foobar2000 component project for macOS that adds a context-men
 
 The command currently:
 
-1. Checks clipboard for manual search term in format `Artist - Title`.
-2. If clipboard is not usable, reads selected track filename (expects `Artist - Title.ext`).
-3. Calls MusicBrainz web API and fetches multiple possible matches.
-4. Shows a selectable list of releases.
-5. Uses your selected release and shows the chosen tags in a popup.
+1. Opens a query dialog with fields: Provider, Artist, Track, Release, Label, Year.
+2. Lets you toggle search mode: tokenized (broad) or exact phrase (strict).
+3. Prefills Artist + Track from clipboard (`Artist - Title`) or filename when possible.
+4. Calls MusicBrainz web API and fetches multiple possible matches.
+5. Enforces that every field you filled out must match returned data.
+6. Shows a selectable list of releases.
+7. Uses your selected release and shows the chosen tags in a popup.
 
 Writing tags back to files is intentionally left disabled in this starter so you can choose your preferred write strategy and safeguards first.
 
@@ -77,12 +79,14 @@ The current `CMakeLists.txt` builds required foobar2000 SDK static libraries fro
 
 ## Manual search usage
 
-When a file is badly named, you can still search:
+When a file is badly named, you can still search with the dialog fields.
 
-1. Copy text in the form `Artist - Title` to clipboard.
+1. Optionally copy text in the form `Artist - Title` to clipboard for prefill.
 2. Right-click the track and run `Lookup Tags Online`.
+3. Enter any subset of Artist, Release, Track, Year.
+4. Choose tokenized search for broader results, or exact phrase for tighter results.
 
-If the clipboard term is valid, it takes priority over filename parsing.
+Every field you provide is treated as required for candidate matching.
 
 ## Legal / API usage
 
