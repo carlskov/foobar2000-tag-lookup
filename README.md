@@ -8,8 +8,9 @@ The command currently:
 
 1. Checks clipboard for manual search term in format `Artist - Title`.
 2. If clipboard is not usable, reads selected track filename (expects `Artist - Title.ext`).
-3. Calls MusicBrainz web API.
-4. Shows candidate tags in a popup.
+3. Calls MusicBrainz web API and fetches multiple possible matches.
+4. Shows a selectable list of releases.
+5. Uses your selected release and shows the chosen tags in a popup.
 
 Writing tags back to files is intentionally left disabled in this starter so you can choose your preferred write strategy and safeguards first.
 

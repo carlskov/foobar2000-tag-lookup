@@ -1,5 +1,6 @@
 #include <foobar2000/SDK/foobar2000.h>
 
+#include "match_selector.h"
 #include "tag_lookup_service.h"
 
 #include <array>
@@ -119,18 +120,29 @@ class ContextTagLookup : public contextmenu_item_simple {
     }
 
     taglookup::TagLookupService service;
-    const auto result = service.Lookup(query);
+    const auto matches = service.LookupAll(query, 200);
 
-    if (!result.has_value()) {
+    if (matches.empty()) {
       popup_message::g_show("No tag match found online.", "Tag Lookup");
       return;
     }
 
+    const auto selectedIndex = taglookup::SelectTagResultIndex(query, matches);
+    if (!selectedIndex.has_value()) {
+      popup_message::g_show("Lookup canceled.", "Tag Lookup");
+      return;
+    }
+
+    const auto& result = matches[*selectedIndex];
+
     pfc::string_formatter msg;
-    msg << "Artist: " << result->artist.c_str() << "\n";
-    msg << "Title: " << result->title.c_str() << "\n";
-    msg << "Album: " << result->album.c_str() << "\n";
-    msg << "Date: " << result->date.c_str() << "\n\n";
+    msg << "Selected " << static_cast<unsigned>(*selectedIndex + 1) << " of "
+        << static_cast<unsigned>(matches.size()) << " matches\n\n";
+    msg << "Artist: " << result.artist.c_str() << "\n";
+    msg << "Title: " << result.title.c_str() << "\n";
+    msg << "Album: " << result.album.c_str() << "\n";
+    msg << "Date: " << result.date.c_str() << "\n";
+    msg << "Score: " << result.score << "\n\n";
     msg << "Next step: write these values back through metadb_io_v2."
            " This starter keeps writes disabled by default.";
 

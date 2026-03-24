@@ -2701,6 +2701,14 @@ src/component_main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_taglookup.dir/build.make CMakeFiles/foo_taglookup.dir/src/component_main.cpp.s
 .PHONY : src/component_main.cpp.s
 
+src/match_selector_mac.o: src/match_selector_mac.mm.o
+.PHONY : src/match_selector_mac.o
+
+# target to build an object file
+src/match_selector_mac.mm.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_taglookup.dir/build.make CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o
+.PHONY : src/match_selector_mac.mm.o
+
 src/tag_lookup_service.o: src/tag_lookup_service.cpp.o
 .PHONY : src/tag_lookup_service.o
 
@@ -3053,6 +3061,7 @@ help:
 	@echo "... src/component_main.o"
 	@echo "... src/component_main.i"
 	@echo "... src/component_main.s"
+	@echo "... src/match_selector_mac.o"
 	@echo "... src/tag_lookup_service.o"
 	@echo "... src/tag_lookup_service.i"
 	@echo "... src/tag_lookup_service.s"

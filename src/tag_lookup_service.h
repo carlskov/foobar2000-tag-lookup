@@ -1,7 +1,7 @@
 #pragma once
 
-#include <optional>
 #include <string>
+#include <vector>
 
 namespace taglookup {
 
@@ -15,11 +15,14 @@ struct TagResult {
   std::string title;
   std::string album;
   std::string date;
+  std::string recording_id;
+  std::string release_id;
+  int score = 0;
 };
 
 class TagLookupService {
  public:
-  std::optional<TagResult> Lookup(const LookupQuery& query) const;
+  std::vector<TagResult> LookupAll(const LookupQuery& query, size_t limit = 25) const;
 };
 
 }  // namespace taglookup
