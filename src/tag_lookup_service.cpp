@@ -199,6 +199,23 @@ std::string ExtractPrimaryLabel(const nlohmann::json& release) {
   return li["label"].value("name", "");
 }
 
+std::string BuildMusicBrainzCoverUrl(const nlohmann::json& release,
+                                     const std::string& releaseId) {
+  if (releaseId.empty()) {
+    return "";
+  }
+
+  if (release.contains("cover-art-archive") && release["cover-art-archive"].is_object()) {
+    const auto& caa = release["cover-art-archive"];
+    if (caa.contains("front") && caa["front"].is_boolean() &&
+        !caa["front"].get<bool>()) {
+      return "";
+    }
+  }
+
+  return "https://coverartarchive.org/release/" + releaseId + "/front-250";
+}
+
 std::string Trim(std::string s) {
   const size_t begin = s.find_first_not_of(" \t\r\n");
   if (begin == std::string::npos) {
@@ -614,6 +631,7 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
         item.release_id = release.value("id", "");
         item.artist = ExtractPrimaryArtist(release);
         item.label = ExtractPrimaryLabel(release);
+        item.cover_url = BuildMusicBrainzCoverUrl(release, item.release_id);
         item.score = ReadScore(release);
         item.title = query.title;
 
@@ -670,6 +688,33 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
       curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     }
 
+    auto resolveDiscogsCoverUrl = [&](const std::string& releaseId) {
+      if (releaseId.empty()) {
+        return std::string();
+      }
+
+      nlohmann::json releaseJson;
+      const std::string releaseUrl = "https://api.discogs.com/releases/" + releaseId;
+      if (!PerformJsonRequest(curl, releaseUrl, releaseJson, headers)) {
+        return std::string();
+      }
+
+      if (releaseJson.contains("images") && releaseJson["images"].is_array() &&
+          !releaseJson["images"].empty()) {
+        const auto& first = releaseJson["images"][0];
+        const std::string small = JsonFieldToString(first, "uri150");
+        if (!small.empty()) {
+          return small;
+        }
+        const std::string full = JsonFieldToString(first, "uri");
+        if (!full.empty()) {
+          return full;
+        }
+      }
+
+      return std::string();
+    };
+
     while (page <= total_pages && out.size() < safe_limit) {
       const std::string url = BuildDiscogsUrl(curl, query, page_size, page, mode);
       nlohmann::json json;
@@ -697,6 +742,13 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
         TagResult item;
         item.release_id = JsonFieldToString(result, "id");
         item.date = JsonFieldToString(result, "year");
+        item.cover_url = JsonFieldToString(result, "thumb");
+        if (item.cover_url.empty()) {
+          item.cover_url = JsonFieldToString(result, "cover_image");
+        }
+        if (item.cover_url.empty()) {
+          item.cover_url = resolveDiscogsCoverUrl(item.release_id);
+        }
         item.score = 0;
 
         const std::string titleCombined = JsonFieldToString(result, "title");

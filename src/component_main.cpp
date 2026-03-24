@@ -263,31 +263,26 @@ class ContextTagLookup : public contextmenu_item_simple {
     seed.overwrite_title_on_propagation = static_cast<bool>(g_overwriteTitleSetting);
 
     taglookup::TagLookupService service;
-    std::string statusMessage;
-    taglookup::LookupQuery query;
-    std::vector<taglookup::TagResult> matches;
+    const auto queryOpt = taglookup::PromptForLookupQuery(seed, "");
+    if (!queryOpt.has_value()) {
+      return;
+    }
 
-    while (true) {
-      const auto queryOpt = taglookup::PromptForLookupQuery(seed, statusMessage);
-      if (!queryOpt.has_value()) {
-        return;
-      }
+    const taglookup::LookupQuery query = *queryOpt;
+    StoreLookupSettings(query);
+    seed = query;
 
-      query = *queryOpt;
-      StoreLookupSettings(query);
-      seed = query;
-      matches = service.LookupAll(query, 50);
+    const std::vector<taglookup::TagResult> matches = service.LookupAll(query, 50);
+    if (matches.empty()) {
+      popup_message::g_show("No results found. Adjust fields and run Lookup Tags Online again.",
+                            "Tag Lookup");
+      return;
+    }
 
-      if (matches.empty()) {
-        statusMessage = "No results found. Adjust fields and try again.";
-        continue;
-      }
-
-      const auto selectedIndex = taglookup::SelectTagResultIndex(query, matches);
-      if (!selectedIndex.has_value()) {
-        statusMessage = "Selection canceled. You can refine and search again.";
-        continue;
-      }
+    const auto selectedIndex = taglookup::SelectTagResultIndex(query, matches);
+    if (!selectedIndex.has_value()) {
+      return;
+    }
 
       const auto& result = matches[*selectedIndex];
 
@@ -322,7 +317,6 @@ class ContextTagLookup : public contextmenu_item_simple {
 
       popup_message::g_show(msg, "Tag Lookup: Propagating Tags");
       return;
-    }
   }
 
   GUID get_item_guid(unsigned index) override {
@@ -345,7 +339,7 @@ class ContextTagLookup : public contextmenu_item_simple {
 
 static contextmenu_item_factory_t<ContextTagLookup> g_context_tag_lookup_factory;
 
-DECLARE_COMPONENT_VERSION("Tag Lookup (mac starter)", "0.1.9",
+DECLARE_COMPONENT_VERSION("Tag Lookup (mac starter)", "0.1.11",
                           "Looks up online release metadata and propagates tags to selected files.");
 
 }  // namespace

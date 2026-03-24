@@ -32,6 +32,7 @@ struct TagResult {
   std::string album;
   std::string label;
   std::string date;
+  std::string cover_url;
   std::string recording_id;
   std::string release_id;
   int score = 0;
