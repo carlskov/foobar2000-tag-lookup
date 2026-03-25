@@ -43,28 +43,12 @@ namespace {
 
 using json = nlohmann::json;
 
-constexpr GUID kMenuCastGuid =
+constexpr GUID kMenuToggleGuid =
     {0xa3a4273d, 0x561b, 0x48d5, {0x9f, 0xae, 0x71, 0x6f, 0x5e, 0x04, 0x95, 0x22}};
-constexpr GUID kMenuDisconnectGuid =
-  {0x9f694b7f, 0x13f2, 0x4ecd, {0xbe, 0x1f, 0xd6, 0x6c, 0x57, 0xf0, 0xaa, 0x71}};
 constexpr GUID kChromecastDeviceGuid =
     {0xf3d4f3bc, 0x2c9f, 0x4a31, {0x90, 0x7d, 0xe4, 0x35, 0xcf, 0x22, 0x88, 0xa1}};
 
-struct PlaybackMenuItemInfo {
-  const char* label;
-  const char* description;
-  GUID guid;
-  bool disconnectsSession;
-};
-
-constexpr std::array<PlaybackMenuItemInfo, 2> kPlaybackMenuItems = {{
-    {"Cast to Chromecast",
-     "Cast now playing track from current position and continue upcoming playlist items.",
-     kMenuCastGuid,
-     false},
-    {"Chromecast: Disconnect", "Disconnect active Chromecast session from foobar controls.",
-     kMenuDisconnectGuid, true},
-}};
+constexpr size_t kChromecastQueueWindow = 26;
 
 constexpr const char* kCastReceiverNamespace = "urn:x-cast:com.google.cast.receiver";
 constexpr const char* kCastConnectionNamespace = "urn:x-cast:com.google.cast.tp.connection";
@@ -221,13 +205,30 @@ class LocalFileHttpServer {
   }
 
   ~LocalFileHttpServer() {
+    Stop();
+    if (worker_.joinable()) {
+      worker_.join();
+    }
+  }
+
+  void Stop() {
     running_.store(false);
+
     if (listenFd_ >= 0) {
+      shutdown(listenFd_, SHUT_RDWR);
       close(listenFd_);
       listenFd_ = -1;
     }
-    if (worker_.joinable()) {
-      worker_.join();
+
+    std::vector<int> clientFds;
+    {
+      std::lock_guard<std::mutex> lock(clientMutex_);
+      clientFds.assign(activeClientFds_.begin(), activeClientFds_.end());
+    }
+
+    for (int fd : clientFds) {
+      shutdown(fd, SHUT_RDWR);
+      close(fd);
     }
   }
 
@@ -323,7 +324,15 @@ class LocalFileHttpServer {
 
       const int yes = 1;
       setsockopt(clientFd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
+      {
+        std::lock_guard<std::mutex> lock(clientMutex_);
+        activeClientFds_.insert(clientFd);
+      }
       HandleClient(clientFd);
+      {
+        std::lock_guard<std::mutex> lock(clientMutex_);
+        activeClientFds_.erase(clientFd);
+      }
       close(clientFd);
     }
   }
@@ -533,10 +542,25 @@ class LocalFileHttpServer {
   uint16_t port_ = 0;
   std::atomic<bool> running_{false};
   std::thread worker_;
+  std::mutex clientMutex_;
+  std::set<int> activeClientFds_;
 };
 
 std::mutex g_serversMutex;
 std::vector<std::shared_ptr<LocalFileHttpServer>> g_servers;
+
+void ClearLocalServers() {
+  std::vector<std::shared_ptr<LocalFileHttpServer>> servers;
+  {
+    std::lock_guard<std::mutex> lock(g_serversMutex);
+    servers.swap(g_servers);
+  }
+  for (const auto& server : servers) {
+    if (server) {
+      server->Stop();
+    }
+  }
+}
 
 std::mutex g_activeCastMutex;
 std::optional<ChromecastDeviceInfo> g_activeCastDevice;
@@ -545,10 +569,9 @@ class ChromecastPlaybackBridgeDynamic;
 std::mutex g_playbackBridgeMutex;
 std::unique_ptr<ChromecastPlaybackBridgeDynamic> g_playbackBridge;
 bool g_playbackBridgeRegistered = false;
-std::atomic<uint64_t> g_syncRequestSerial{0};
+std::atomic<bool> g_componentShuttingDown{false};
+std::atomic<uint64_t> g_castReloadSerial{0};
 std::mutex g_castActionMutex;
-std::mutex g_trackMirrorStateMutex;
-std::string g_lastMirroredTrackKey;
 
 void SetActiveCastDevice(const ChromecastDeviceInfo& device) {
   std::lock_guard<std::mutex> lock(g_activeCastMutex);
@@ -576,7 +599,9 @@ bool HasActiveCastDevice() {
 
 void RegisterPlaybackBridge();
 void UnregisterPlaybackBridge();
-void RequestActiveChromecastSync(int delayMs);
+void RequestChromecastQueueReloadForDevice(const ChromecastDeviceInfo& device, bool showPopup);
+void RequestActiveChromecastQueueReload(bool showPopup = false);
+void DisableChromecastSession(bool showPopup, bool sendStop);
 
 std::string GetLocalIpForTarget(const std::string& targetHost) {
   addrinfo hints = {};
@@ -1488,7 +1513,8 @@ bool CollectPlaybackQueue(std::vector<metadb_handle_ptr>& outItems, double& outS
   }
 
   const t_size count = playlists->playlist_get_item_count(playlistIndex);
-  for (t_size i = itemIndex; i < count; ++i) {
+  const t_size limit = std::min<t_size>(count, itemIndex + kChromecastQueueWindow);
+  for (t_size i = itemIndex; i < limit; ++i) {
     metadb_handle_ptr item;
     if (playlists->playlist_get_item_handle(item, playlistIndex, i) && item.is_valid()) {
       outItems.push_back(item);
@@ -1502,10 +1528,13 @@ bool CollectPlaybackQueue(std::vector<metadb_handle_ptr>& outItems, double& outS
   }
 
   if (outItems.front() != nowPlaying) {
+    if (outItems.size() >= kChromecastQueueWindow) {
+      outItems.pop_back();
+    }
     outItems.insert(outItems.begin(), nowPlaying);
   }
 
-  statusMessage = "Prepared current track + upcoming playlist items.";
+  statusMessage = "Prepared current track + next up to 25 playlist items.";
   return true;
 }
 
@@ -1588,11 +1617,6 @@ bool RunChromecastCast(const ChromecastDeviceInfo& device,
 
   std::string error;
 
-  auto clearLocalServers = []() {
-    std::lock_guard<std::mutex> lock(g_serversMutex);
-    g_servers.clear();
-  };
-
   const std::string bindIp = GetLocalIpForTarget(device.host);
   if (bindIp.empty()) {
     output += "Could not determine local LAN IP reachable by Chromecast.";
@@ -1601,7 +1625,7 @@ bool RunChromecastCast(const ChromecastDeviceInfo& device,
 
   // Pre-resolve a bounded queue before Cast app negotiation so we can send
   // immediately after receiver readiness and avoid huge payloads.
-  clearLocalServers();
+  ClearLocalServers();
   json items = json::array();
   size_t resolvedCount = 0;
   bool queueTruncated = false;
@@ -1614,7 +1638,7 @@ bool RunChromecastCast(const ChromecastDeviceInfo& device,
 
     PreparedQueueItem prepared;
     if (!ResolveHandleToMedia(device, bindIp, queueItems[i], prepared, output, error)) {
-      clearLocalServers();
+      ClearLocalServers();
       output += error;
       return false;
     }
@@ -1670,7 +1694,7 @@ bool RunChromecastCast(const ChromecastDeviceInfo& device,
   }
 
   if (items.empty()) {
-    clearLocalServers();
+    ClearLocalServers();
     output += "No queue items could be prepared within Chromecast payload limits.";
     return false;
   }
@@ -1680,7 +1704,7 @@ bool RunChromecastCast(const ChromecastDeviceInfo& device,
 
   SecureTlsSocket sock;
   if (!sock.Connect(device.host, device.port, error)) {
-    clearLocalServers();
+    ClearLocalServers();
     output = error;
     return false;
   }
@@ -1693,14 +1717,14 @@ bool RunChromecastCast(const ChromecastDeviceInfo& device,
   std::string transportId;
   std::string sessionId;
   if (!EnsureDefaultMediaReceiver(sock, sourceId, transportId, sessionId, output, error)) {
-    clearLocalServers();
+    ClearLocalServers();
     output += error;
     return false;
   }
 
   if (!SendCastMessage(sock, sourceId, transportId, kCastConnectionNamespace,
                        MakeConnectPayload(), error)) {
-    clearLocalServers();
+    ClearLocalServers();
     output += error;
     return false;
   }
@@ -1729,7 +1753,7 @@ bool RunChromecastCast(const ChromecastDeviceInfo& device,
     };
 
     if (!SendCastMessage(sock, sourceId, transportId, kCastMediaNamespace, loadPayload, error)) {
-      clearLocalServers();
+      ClearLocalServers();
       output += queueError + "\n";
       output += "LOAD fallback failed: " + error;
       return false;
@@ -1779,7 +1803,8 @@ std::optional<int> ExtractMediaSessionIdFromMediaStatus(const json& payload) {
 }
 
 bool RunChromecastMediaControl(const ChromecastDeviceInfo& device, const std::string& commandType,
-                               std::string& output) {
+                               std::string& output,
+                               std::optional<double> currentTime = std::nullopt) {
   output.clear();
 
   SecureTlsSocket sock;
@@ -1857,6 +1882,12 @@ bool RunChromecastMediaControl(const ChromecastDeviceInfo& device, const std::st
       {"requestId", 9002},
       {"mediaSessionId", *mediaSessionId},
   };
+  if (currentTime.has_value()) {
+    controlPayload["currentTime"] = std::max(0.0, *currentTime);
+    if (commandType == "SEEK") {
+      controlPayload["resumeState"] = "PLAYBACK_START";
+    }
+  }
 
   if (!SendCastMessage(sock, sourceId, transportId, kCastMediaNamespace, controlPayload, error)) {
     output += error;
@@ -1871,12 +1902,20 @@ bool RunChromecastMediaControl(const ChromecastDeviceInfo& device, const std::st
 void RunChromecastMediaControlAsync(const ChromecastDeviceInfo& device,
                                     const std::string& commandType,
                                     const std::string& commandName,
-                                    bool showSuccessPopup = true) {
-  std::thread([device, commandType, commandName, showSuccessPopup]() {
+                                    bool showSuccessPopup = true,
+                                    std::optional<double> currentTime = std::nullopt) {
+  std::thread([device, commandType, commandName, showSuccessPopup, currentTime]() {
     std::string output;
-    const bool ok = RunChromecastMediaControl(device, commandType, output);
+    const bool ok = RunChromecastMediaControl(device, commandType, output, currentTime);
+
+    if (g_componentShuttingDown.load(std::memory_order_relaxed)) {
+      return;
+    }
 
     fb2k::inMainThread([ok, device, commandName, output, showSuccessPopup]() {
+      if (g_componentShuttingDown.load(std::memory_order_relaxed)) {
+        return;
+      }
       if (ok) {
         if (showSuccessPopup) {
           pfc::string_formatter msg;
@@ -1901,13 +1940,14 @@ void RunChromecastMediaControlAsync(const ChromecastDeviceInfo& device,
   }).detach();
 }
 
-void SyncActiveChromecastFromLocalPlayback(bool showPopup = false) {
-  ChromecastDeviceInfo device;
-  if (!TryGetActiveCastDevice(device)) {
-    return;
-  }
+void RequestChromecastQueueReloadForDevice(const ChromecastDeviceInfo& device, bool showPopup) {
+  const uint64_t serial = g_castReloadSerial.fetch_add(1, std::memory_order_relaxed) + 1;
 
-  fb2k::inMainThread([device, showPopup]() {
+  fb2k::inMainThread([device, showPopup, serial]() {
+    if (g_componentShuttingDown.load(std::memory_order_relaxed)) {
+      return;
+    }
+
     std::vector<metadb_handle_ptr> queueItems;
     double startSeconds = 0;
     std::string queueStatus;
@@ -1918,8 +1958,12 @@ void SyncActiveChromecastFromLocalPlayback(bool showPopup = false) {
       return;
     }
 
-    std::thread([device, queueItems, startSeconds, queueStatus, showPopup]() {
+    std::thread([device, queueItems, startSeconds, queueStatus, showPopup, serial]() {
       std::lock_guard<std::mutex> castLock(g_castActionMutex);
+      if (g_componentShuttingDown.load(std::memory_order_relaxed) ||
+          g_castReloadSerial.load(std::memory_order_relaxed) != serial) {
+        return;
+      }
 
       std::string output;
       bool ok = RunChromecastCast(device, queueItems, startSeconds, output);
@@ -1930,13 +1974,31 @@ void SyncActiveChromecastFromLocalPlayback(bool showPopup = false) {
         singleItem.push_back(queueItems.front());
         if (RunChromecastCast(device, singleItem, startSeconds, fallbackOutput)) {
           ok = true;
-          output += "\nAuto-sync fallback: single-item cast succeeded.\n";
+          output += "\nSingle-item fallback succeeded.\n";
           output += fallbackOutput;
         }
       }
 
+      if (g_componentShuttingDown.load(std::memory_order_relaxed) ||
+          g_castReloadSerial.load(std::memory_order_relaxed) != serial) {
+        return;
+      }
+
       fb2k::inMainThread([ok, device, queueItems, startSeconds, queueStatus, output, showPopup]() {
-        if (!ok && showPopup) {
+        if (g_componentShuttingDown.load(std::memory_order_relaxed)) {
+          return;
+        }
+
+        if (ok) {
+          SetActiveCastDevice(device);
+          RegisterPlaybackBridge();
+        }
+
+        if (!showPopup) {
+          return;
+        }
+
+        if (!ok) {
           pfc::string_formatter msg;
           msg << "Failed to sync Chromecast playback.\n\n";
           if (!output.empty()) {
@@ -1946,210 +2008,126 @@ void SyncActiveChromecastFromLocalPlayback(bool showPopup = false) {
           return;
         }
 
-        if (ok) {
-          SetActiveCastDevice(device);
+        pfc::string_formatter msg;
+        msg << "Chromecast enabled.\n\nDevice: " << device.displayName.c_str()
+            << "\nQueue items: " << static_cast<unsigned>(queueItems.size())
+            << "\nStart position: " << pfc::format_time_ex(startSeconds, 1);
+        if (!queueStatus.empty()) {
+          msg << "\n" << queueStatus.c_str();
         }
-
-        if (ok && showPopup) {
-          pfc::string_formatter msg;
-          msg << "Chromecast synced from local playback.\n\nDevice: "
-              << device.displayName.c_str() << "\nQueue items: "
-              << static_cast<unsigned>(queueItems.size())
-              << "\nStart position: " << pfc::format_time_ex(startSeconds, 1);
-          if (!queueStatus.empty()) {
-            msg << "\n" << queueStatus.c_str();
-          }
-          if (!output.empty()) {
-            msg << "\n\nOutput:\n" << output.c_str();
-          }
-          popup_message::g_show(msg, "Chromecast");
+        if (!output.empty()) {
+          msg << "\n\nOutput:\n" << output.c_str();
         }
+        popup_message::g_show(msg, "Chromecast");
       });
     }).detach();
   });
 }
 
-void RequestActiveChromecastSync(int delayMs) {
-  if (delayMs < 0) {
-    delayMs = 0;
-  }
-  const uint64_t serial = g_syncRequestSerial.fetch_add(1, std::memory_order_relaxed) + 1;
-
-  std::thread([serial, delayMs]() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
-    if (g_syncRequestSerial.load(std::memory_order_relaxed) != serial) {
-      return;
-    }
-    SyncActiveChromecastFromLocalPlayback(false);
-  }).detach();
-}
-
-void CastTrackHandleToActiveChromecast(metadb_handle_ptr track, bool syncQueueAfter) {
-  if (!track.is_valid()) {
-    return;
-  }
-
+void RequestActiveChromecastQueueReload(bool showPopup) {
   ChromecastDeviceInfo device;
   if (!TryGetActiveCastDevice(device)) {
     return;
   }
+  RequestChromecastQueueReloadForDevice(device, showPopup);
+}
 
-  std::thread([device, track, syncQueueAfter]() {
-    std::lock_guard<std::mutex> castLock(g_castActionMutex);
+void DisableChromecastSession(bool showPopup, bool sendStop) {
+  g_castReloadSerial.fetch_add(1, std::memory_order_relaxed);
 
-    const std::string trackKey = track->get_path();
-    std::vector<metadb_handle_ptr> oneItem;
-    oneItem.push_back(track);
+  ChromecastDeviceInfo device;
+  const bool hadDevice = TryGetActiveCastDevice(device);
 
-    std::string output;
-    const bool ok = RunChromecastCast(device, oneItem, 0.0, output);
-    if (!ok) {
-      return;
-    }
+  UnregisterPlaybackBridge();
+  ClearActiveCastDevice();
 
-    SetActiveCastDevice(device);
-    {
-      std::lock_guard<std::mutex> lock(g_trackMirrorStateMutex);
-      g_lastMirroredTrackKey = trackKey;
-    }
+  ClearLocalServers();
 
-    if (syncQueueAfter) {
-      RequestActiveChromecastSync(1200);
-    }
-  }).detach();
+  if (hadDevice && sendStop && !g_componentShuttingDown.load(std::memory_order_relaxed)) {
+    RunChromecastMediaControlAsync(device, "STOP", "Disable", false);
+  }
+
+  if (showPopup) {
+    popup_message::g_show("Chromecast disabled.", "Chromecast");
+  }
 }
 
 class PlaybackMenuCommands : public mainmenu_commands {
  public:
-  uint32_t get_command_count() override { return static_cast<uint32_t>(kPlaybackMenuItems.size()); }
+  uint32_t get_command_count() override { return 1; }
 
-  GUID get_command(uint32_t index) override {
-    return index < kPlaybackMenuItems.size() ? kPlaybackMenuItems[index].guid : pfc::guid_null;
-  }
+  GUID get_command(uint32_t index) override { return index == 0 ? kMenuToggleGuid : pfc::guid_null; }
 
   void get_name(uint32_t index, pfc::string_base& out) override {
-    if (index < kPlaybackMenuItems.size()) {
-      out = kPlaybackMenuItems[index].label;
+    if (index == 0) {
+      out = HasActiveCastDevice() ? "Disable Chromecast" : "Enable Chromecast";
     }
   }
 
   bool get_description(uint32_t index, pfc::string_base& out) override {
-    if (index >= kPlaybackMenuItems.size()) {
+    if (index != 0) {
       return false;
     }
-    out = kPlaybackMenuItems[index].description;
+    out = HasActiveCastDevice()
+              ? "Disable Chromecast session control from foobar2000."
+              : "Start the current track on Chromecast and queue the next 25 tracks.";
     return true;
   }
 
   GUID get_parent() override { return mainmenu_groups::playback; }
 
+  bool get_display(uint32_t index, pfc::string_base& out, uint32_t& flags) override {
+    if (index != 0) {
+      return false;
+    }
+    flags = 0;
+    get_name(index, out);
+    if (HasActiveCastDevice()) {
+      flags |= mainmenu_commands::flag_checked;
+    }
+    return true;
+  }
+
   void execute(uint32_t index, service_ptr_t<service_base> p_callback) override {
     (void)p_callback;
-    if (index >= kPlaybackMenuItems.size()) {
+    if (index != 0) {
       return;
     }
 
-    const auto& item = kPlaybackMenuItems[index];
+    if (HasActiveCastDevice()) {
+      DisableChromecastSession(true, true);
+      return;
+    }
 
-    if (index == 0) {
-      // "Cast to Chromecast"
-      std::string deviceName = static_cast<const char*>(g_lastChromecastDevice.get());
-      std::string discoveryStatus;
-      std::vector<ChromecastDeviceInfo> discovered = DiscoverChromecastDevices(discoveryStatus);
+    std::string deviceName = static_cast<const char*>(g_lastChromecastDevice.get());
+    std::string discoveryStatus;
+    std::vector<ChromecastDeviceInfo> discovered = DiscoverChromecastDevices(discoveryStatus);
 
-      if (!PromptChromecastDevice(deviceName, discovered, discoveryStatus)) {
-        return;
-      }
+    if (!PromptChromecastDevice(deviceName, discovered, discoveryStatus)) {
+      return;
+    }
 
-      if (deviceName.empty()) {
-        popup_message::g_show("Chromecast device name cannot be empty.", "Chromecast");
-        return;
-      }
-      auto selected = FindDeviceByName(discovered, deviceName);
+    if (deviceName.empty()) {
+      popup_message::g_show("Chromecast device name cannot be empty.", "Chromecast");
+      return;
+    }
+
+    auto selected = FindDeviceByName(discovered, deviceName);
+    if (!selected.has_value()) {
+      std::string refreshStatus;
+      discovered = DiscoverChromecastDevices(refreshStatus);
+      selected = FindDeviceByName(discovered, deviceName);
       if (!selected.has_value()) {
-        std::string refreshStatus;
-        discovered = DiscoverChromecastDevices(refreshStatus);
-        selected = FindDeviceByName(discovered, deviceName);
-        if (!selected.has_value()) {
-          pfc::string_formatter msg;
-          msg << "Could not resolve Chromecast device: " << deviceName.c_str()
-              << "\nTry selecting one from the dropdown after discovery.";
-          popup_message::g_show(msg, "Chromecast Error");
-          return;
-        }
-      }
-
-      g_lastChromecastDevice = deviceName.c_str();
-
-      std::vector<metadb_handle_ptr> queueItems;
-      double startSeconds = 0;
-      std::string queueStatus;
-      if (!CollectPlaybackQueue(queueItems, startSeconds, queueStatus)) {
-        popup_message::g_show(queueStatus.c_str(), "Chromecast Error");
+        pfc::string_formatter msg;
+        msg << "Could not resolve Chromecast device: " << deviceName.c_str()
+            << "\nTry selecting one from the dropdown after discovery.";
+        popup_message::g_show(msg, "Chromecast Error");
         return;
       }
-
-      ChromecastDeviceInfo capturedDevice = *selected;
-      std::thread([capturedDevice, queueItems, startSeconds, queueStatus]() {
-        std::string output;
-        const bool ok = RunChromecastCast(capturedDevice, queueItems, startSeconds, output);
-
-        fb2k::inMainThread([ok, capturedDevice, queueItems, startSeconds, queueStatus, output]() {
-          if (ok) {
-            SetActiveCastDevice(capturedDevice);
-            
-            // Initialize the mirror state with the current track
-            if (!queueItems.empty()) {
-              const std::string trackKey = queueItems.front()->get_path();
-              {
-                std::lock_guard<std::mutex> lock(g_trackMirrorStateMutex);
-                g_lastMirroredTrackKey = trackKey;
-              }
-            }
-            
-            RegisterPlaybackBridge();
-            RequestActiveChromecastSync(800);
-
-            pfc::string_formatter msg;
-            msg << "Casting started.\n\nDevice: " << capturedDevice.displayName.c_str()
-                << "\nQueue items: " << static_cast<unsigned>(queueItems.size())
-                << "\nStart position: " << pfc::format_time_ex(startSeconds, 1)
-                << "\nFoobar playback controls are now linked to Chromecast.";
-            if (!queueStatus.empty()) {
-              msg << "\n" << queueStatus.c_str();
-            }
-            if (!output.empty()) {
-              msg << "\n\nOutput:\n" << output.c_str();
-            }
-            popup_message::g_show(msg, "Chromecast");
-          } else {
-            pfc::string_formatter msg;
-            msg << "Failed to cast.\n\n";
-            if (!output.empty()) {
-              msg << output.c_str();
-            } else {
-              msg << "Native CastV2 session failed.";
-            }
-            popup_message::g_show(msg, "Chromecast Error");
-          }
-        });
-      }).detach();
-      return;
     }
 
-    if (item.disconnectsSession) {
-      // "Disconnect"
-      ChromecastDeviceInfo device;
-      if (!TryGetActiveCastDevice(device)) {
-        popup_message::g_show("No active Chromecast session to disconnect.",
-                              "Chromecast Error");
-        return;
-      }
-      UnregisterPlaybackBridge();
-      ClearActiveCastDevice();
-      RunChromecastMediaControlAsync(device, "STOP", "Disconnect", true);
-      popup_message::g_show("Chromecast disconnected from foobar controls.", "Chromecast");
-    }
+    g_lastChromecastDevice = deviceName.c_str();
+    RequestChromecastQueueReloadForDevice(*selected, true);
   }
 };
 
@@ -2157,12 +2135,8 @@ class ChromecastPlaybackBridgeDynamic : public play_callback {
  public:
   void on_playback_starting(play_control::t_track_command, bool) override {}
 
-  void on_playback_new_track(metadb_handle_ptr track) override {
-    if (!HasActiveCastDevice()) {
-      return;
-    }
-
-    CastTrackHandleToActiveChromecast(track, true);
+  void on_playback_new_track(metadb_handle_ptr) override {
+    RequestActiveChromecastQueueReload(false);
   }
 
   void on_playback_pause(bool p_state) override {
@@ -2173,6 +2147,16 @@ class ChromecastPlaybackBridgeDynamic : public play_callback {
 
     RunChromecastMediaControlAsync(device, p_state ? "PAUSE" : "PLAY", p_state ? "Pause" : "Play",
                                    false);
+  }
+
+  void on_playback_seek(double timeSeconds) override {
+    ChromecastDeviceInfo device;
+    if (!TryGetActiveCastDevice(device)) {
+      return;
+    }
+
+    RunChromecastMediaControlAsync(device, "SEEK", "Seek", false,
+                                   std::max(0.0, timeSeconds));
   }
 
   void on_playback_stop(play_control::t_stop_reason p_reason) override {
@@ -2188,7 +2172,6 @@ class ChromecastPlaybackBridgeDynamic : public play_callback {
     RunChromecastMediaControlAsync(device, "STOP", "Stop", false);
   }
 
-  void on_playback_seek(double) override {}
   void on_playback_edited(metadb_handle_ptr) override {}
   void on_playback_dynamic_info(const file_info&) override {}
   void on_playback_dynamic_info_track(const file_info&) override {}
@@ -2208,6 +2191,7 @@ void RegisterPlaybackBridge() {
 
   play_callback_manager::get()->register_callback(
       g_playbackBridge.get(), play_callback::flag_on_playback_new_track |
+                                  play_callback::flag_on_playback_seek |
                                   play_callback::flag_on_playback_pause |
                                   play_callback::flag_on_playback_stop,
       false);
@@ -2223,9 +2207,16 @@ void UnregisterPlaybackBridge() {
   g_playbackBridgeRegistered = false;
 }
 
-
+class ChromecastInitQuit : public initquit {
+ public:
+  void on_quit() override {
+    g_componentShuttingDown.store(true, std::memory_order_relaxed);
+    DisableChromecastSession(false, false);
+  }
+};
 
 static mainmenu_commands_factory_t<PlaybackMenuCommands> g_playback_menu_factory;
+static initquit_factory_t<ChromecastInitQuit> g_chromecast_initquit_factory;
 
 DECLARE_COMPONENT_VERSION("Chromecast Audio Sender (native)", "0.3.22",
                           "Cast currently playing track from current position and continue "
