@@ -133,6 +133,25 @@ target_link_libraries(foo_taglookup PRIVATE
   fb2k_pfc
 )
 
+add_library(foo_chromecast SHARED
+  src/chromecast_component.mm
+)
+
+target_include_directories(foo_chromecast PRIVATE
+  ${FOOBAR2000_SDK_ROOT}
+  ${FOOBAR2000_SDK_ROOT}/foobar2000/SDK
+  ${FOOBAR2000_HELPERS_DIR}
+  src
+)
+
+target_link_libraries(foo_chromecast PRIVATE
+  nlohmann_json::nlohmann_json
+  fb2k_component_client
+  fb2k_sdk
+  fb2k_shared
+  fb2k_pfc
+)
+
 # The SDK ships its own helper/static libraries and project files.
 # For an actual build, add the SDK libs here according to SDK docs.
 # Example (names vary by SDK release):
@@ -143,18 +162,31 @@ set_target_properties(foo_taglookup PROPERTIES
   PREFIX ""
 )
 
+set_target_properties(foo_chromecast PROPERTIES
+  OUTPUT_NAME "foo_chromecast"
+  PREFIX ""
+)
+
 if(APPLE)
   target_compile_definitions(foo_taglookup PRIVATE _FILE_OFFSET_BITS=64)
+  target_compile_definitions(foo_chromecast PRIVATE _FILE_OFFSET_BITS=64)
   find_library(COREFOUNDATION_FRAMEWORK CoreFoundation)
   find_library(FOUNDATION_FRAMEWORK Foundation)
   find_library(APPKIT_FRAMEWORK AppKit)
+  find_library(SECURITY_FRAMEWORK Security)
   if(COREFOUNDATION_FRAMEWORK)
     target_link_libraries(foo_taglookup PRIVATE ${COREFOUNDATION_FRAMEWORK})
+    target_link_libraries(foo_chromecast PRIVATE ${COREFOUNDATION_FRAMEWORK})
   endif()
   if(FOUNDATION_FRAMEWORK)
     target_link_libraries(foo_taglookup PRIVATE ${FOUNDATION_FRAMEWORK})
+    target_link_libraries(foo_chromecast PRIVATE ${FOUNDATION_FRAMEWORK})
   endif()
   if(APPKIT_FRAMEWORK)
     target_link_libraries(foo_taglookup PRIVATE ${APPKIT_FRAMEWORK})
+    target_link_libraries(foo_chromecast PRIVATE ${APPKIT_FRAMEWORK})
+  endif()
+  if(SECURITY_FRAMEWORK)
+    target_link_libraries(foo_chromecast PRIVATE ${SECURITY_FRAMEWORK})
   endif()
 endif()

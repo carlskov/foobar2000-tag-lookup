@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -arch arm64 -dynamiclib -Wl,-headerpad_max_install_names -o foo_chromecast.dylib -install_name @rpath/foo_chromecast.dylib CMakeFiles/foo_chromecast.dir/src/chromecast_component.mm.o  libfb2k_component_client.a libfb2k_sdk.a libfb2k_shared.a libfb2k_pfc.a -framework CoreFoundation -framework Foundation -framework AppKit -framework Security

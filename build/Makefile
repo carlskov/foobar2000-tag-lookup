@@ -181,6 +181,19 @@ foo_taglookup/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_taglookup.dir/build.make CMakeFiles/foo_taglookup.dir/build
 .PHONY : foo_taglookup/fast
 
+#=============================================================================
+# Target rules for targets named foo_chromecast
+
+# Build rule for target.
+foo_chromecast: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 foo_chromecast
+.PHONY : foo_chromecast
+
+# fast build rule for target.
+foo_chromecast/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_chromecast.dir/build.make CMakeFiles/foo_chromecast.dir/build
+.PHONY : foo_chromecast/fast
+
 sdk/foobar2000-sdk-2025-03-07/foobar2000/SDK/abort_callback.o: sdk/foobar2000-sdk-2025-03-07/foobar2000/SDK/abort_callback.cpp.o
 .PHONY : sdk/foobar2000-sdk-2025-03-07/foobar2000/SDK/abort_callback.o
 
@@ -2677,6 +2690,14 @@ sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/fb2k_pfc.dir/build.make CMakeFiles/fb2k_pfc.dir/sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.cpp.s
 .PHONY : sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.cpp.s
 
+src/chromecast_component.o: src/chromecast_component.mm.o
+.PHONY : src/chromecast_component.o
+
+# target to build an object file
+src/chromecast_component.mm.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_chromecast.dir/build.make CMakeFiles/foo_chromecast.dir/src/chromecast_component.mm.o
+.PHONY : src/chromecast_component.mm.o
+
 src/component_main.o: src/component_main.cpp.o
 .PHONY : src/component_main.o
 
@@ -2753,6 +2774,7 @@ help:
 	@echo "... fb2k_pfc"
 	@echo "... fb2k_sdk"
 	@echo "... fb2k_shared"
+	@echo "... foo_chromecast"
 	@echo "... foo_taglookup"
 	@echo "... sdk/foobar2000-sdk-2025-03-07/foobar2000/SDK/abort_callback.o"
 	@echo "... sdk/foobar2000-sdk-2025-03-07/foobar2000/SDK/abort_callback.i"
@@ -3066,6 +3088,7 @@ help:
 	@echo "... sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.o"
 	@echo "... sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.i"
 	@echo "... sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.s"
+	@echo "... src/chromecast_component.o"
 	@echo "... src/component_main.o"
 	@echo "... src/component_main.i"
 	@echo "... src/component_main.s"

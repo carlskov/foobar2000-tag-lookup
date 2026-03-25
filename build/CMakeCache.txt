@@ -399,6 +399,9 @@ PKG_CONFIG_ARGN:STRING=
 //pkg-config executable
 PKG_CONFIG_EXECUTABLE:FILEPATH=PKG_CONFIG_EXECUTABLE-NOTFOUND
 
+//Path to a library.
+SECURITY_FRAMEWORK:FILEPATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework
+
 //Value Computed by CMake
 foo_taglookup_BINARY_DIR:STATIC=/Users/jesthuecarlskov/code/fb2k/build
 
