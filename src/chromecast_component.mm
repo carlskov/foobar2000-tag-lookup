@@ -572,6 +572,9 @@ bool g_playbackBridgeRegistered = false;
 std::atomic<bool> g_componentShuttingDown{false};
 std::atomic<uint64_t> g_castReloadSerial{0};
 std::mutex g_castActionMutex;
+std::mutex g_localVolumeMutex;
+bool g_localVolumeMutedForChromecast = false;
+float g_savedLocalVolumeDb = 0;
 
 void SetActiveCastDevice(const ChromecastDeviceInfo& device) {
   std::lock_guard<std::mutex> lock(g_activeCastMutex);
@@ -595,6 +598,37 @@ bool TryGetActiveCastDevice(ChromecastDeviceInfo& out) {
 bool HasActiveCastDevice() {
   std::lock_guard<std::mutex> lock(g_activeCastMutex);
   return g_activeCastDevice.has_value();
+}
+
+void MuteLocalPlaybackForChromecast() {
+  auto playback = playback_control::get();
+  if (!playback.is_valid()) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(g_localVolumeMutex);
+  if (g_localVolumeMutedForChromecast) {
+    return;
+  }
+
+  g_savedLocalVolumeDb = playback->get_volume();
+  playback->set_volume(static_cast<float>(playback_control::volume_mute));
+  g_localVolumeMutedForChromecast = true;
+}
+
+void RestoreLocalPlaybackVolume() {
+  auto playback = playback_control::get();
+  if (!playback.is_valid()) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(g_localVolumeMutex);
+  if (!g_localVolumeMutedForChromecast) {
+    return;
+  }
+
+  playback->set_volume(g_savedLocalVolumeDb);
+  g_localVolumeMutedForChromecast = false;
 }
 
 void RegisterPlaybackBridge();
@@ -1992,6 +2026,7 @@ void RequestChromecastQueueReloadForDevice(const ChromecastDeviceInfo& device, b
         if (ok) {
           SetActiveCastDevice(device);
           RegisterPlaybackBridge();
+          MuteLocalPlaybackForChromecast();
         }
 
         if (!showPopup) {
@@ -2040,6 +2075,7 @@ void DisableChromecastSession(bool showPopup, bool sendStop) {
 
   UnregisterPlaybackBridge();
   ClearActiveCastDevice();
+  RestoreLocalPlaybackVolume();
 
   ClearLocalServers();
 
