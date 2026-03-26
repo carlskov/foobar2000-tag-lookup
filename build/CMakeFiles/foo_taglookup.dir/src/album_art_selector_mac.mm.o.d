@@ -1,5 +1,5 @@
-CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o: \
-  /Users/jesthuecarlskov/code/fb2k/src/search_input_mac.mm \
+CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o: \
+  /Users/jesthuecarlskov/code/fb2k/src/album_art_selector_mac.mm \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/AppKit.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h \
@@ -1397,7 +1397,7 @@ CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWritingToolsCoordinatorAnimationParameters.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWritingToolsCoordinatorContext.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWritingToolsCoordinator.h \
-  /Users/jesthuecarlskov/code/fb2k/src/search_input.h \
+  /Users/jesthuecarlskov/code/fb2k/src/album_art_selector.h \
   /Users/jesthuecarlskov/code/fb2k/src/album_art_service.h \
   /Users/jesthuecarlskov/code/fb2k/src/tag_lookup_service.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/string \

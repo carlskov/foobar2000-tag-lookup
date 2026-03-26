@@ -72,10 +72,38 @@ include CMakeFiles/foo_taglookup.dir/flags.make
 CMakeFiles/foo_taglookup.dir/codegen:
 .PHONY : CMakeFiles/foo_taglookup.dir/codegen
 
+CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o: CMakeFiles/foo_taglookup.dir/flags.make
+CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o: /Users/jesthuecarlskov/code/fb2k/src/album_art_service.cpp
+CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o: CMakeFiles/foo_taglookup.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o -MF CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o.d -o CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o -c /Users/jesthuecarlskov/code/fb2k/src/album_art_service.cpp
+
+CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/jesthuecarlskov/code/fb2k/src/album_art_service.cpp > CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.i
+
+CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/jesthuecarlskov/code/fb2k/src/album_art_service.cpp -o CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.s
+
+CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o: CMakeFiles/foo_taglookup.dir/flags.make
+CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o: /Users/jesthuecarlskov/code/fb2k/src/album_art_selector_mac.mm
+CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o: CMakeFiles/foo_taglookup.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building OBJCXX object CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o"
+	/usr/bin/c++ $(OBJCXX_DEFINES) $(OBJCXX_INCLUDES) -x objective-c++ $(OBJCXX_FLAGS) -MD -MT CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o -MF CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o.d -o CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o -c /Users/jesthuecarlskov/code/fb2k/src/album_art_selector_mac.mm
+
+CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing OBJCXX source to CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.i"
+	/usr/bin/c++ $(OBJCXX_DEFINES) $(OBJCXX_INCLUDES) $(OBJCXX_FLAGS) -E /Users/jesthuecarlskov/code/fb2k/src/album_art_selector_mac.mm > CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.i
+
+CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling OBJCXX source to assembly CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.s"
+	/usr/bin/c++ $(OBJCXX_DEFINES) $(OBJCXX_INCLUDES) $(OBJCXX_FLAGS) -S /Users/jesthuecarlskov/code/fb2k/src/album_art_selector_mac.mm -o CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.s
+
 CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o: CMakeFiles/foo_taglookup.dir/flags.make
 CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o: /Users/jesthuecarlskov/code/fb2k/src/component_main.cpp
 CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o: CMakeFiles/foo_taglookup.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o -MF CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o.d -o CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o -c /Users/jesthuecarlskov/code/fb2k/src/component_main.cpp
 
 CMakeFiles/foo_taglookup.dir/src/component_main.cpp.i: cmake_force
@@ -89,7 +117,7 @@ CMakeFiles/foo_taglookup.dir/src/component_main.cpp.s: cmake_force
 CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o: CMakeFiles/foo_taglookup.dir/flags.make
 CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o: /Users/jesthuecarlskov/code/fb2k/src/match_selector_mac.mm
 CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o: CMakeFiles/foo_taglookup.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building OBJCXX object CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building OBJCXX object CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o"
 	/usr/bin/c++ $(OBJCXX_DEFINES) $(OBJCXX_INCLUDES) -x objective-c++ $(OBJCXX_FLAGS) -MD -MT CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o -MF CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o.d -o CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o -c /Users/jesthuecarlskov/code/fb2k/src/match_selector_mac.mm
 
 CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.i: cmake_force
@@ -103,7 +131,7 @@ CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.s: cmake_force
 CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o: CMakeFiles/foo_taglookup.dir/flags.make
 CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o: /Users/jesthuecarlskov/code/fb2k/src/search_input_mac.mm
 CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o: CMakeFiles/foo_taglookup.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building OBJCXX object CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building OBJCXX object CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o"
 	/usr/bin/c++ $(OBJCXX_DEFINES) $(OBJCXX_INCLUDES) -x objective-c++ $(OBJCXX_FLAGS) -MD -MT CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o -MF CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o.d -o CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o -c /Users/jesthuecarlskov/code/fb2k/src/search_input_mac.mm
 
 CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.i: cmake_force
@@ -117,7 +145,7 @@ CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.s: cmake_force
 CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o: CMakeFiles/foo_taglookup.dir/flags.make
 CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o: /Users/jesthuecarlskov/code/fb2k/src/tag_lookup_service.cpp
 CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o: CMakeFiles/foo_taglookup.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o -MF CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o.d -o CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o -c /Users/jesthuecarlskov/code/fb2k/src/tag_lookup_service.cpp
 
 CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.i: cmake_force
@@ -130,6 +158,8 @@ CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.s: cmake_force
 
 # Object files for target foo_taglookup
 foo_taglookup_OBJECTS = \
+"CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o" \
+"CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o" \
 "CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o" \
 "CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o" \
 "CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o" \
@@ -138,6 +168,8 @@ foo_taglookup_OBJECTS = \
 # External object files for target foo_taglookup
 foo_taglookup_EXTERNAL_OBJECTS =
 
+foo_taglookup.dylib: CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o
+foo_taglookup.dylib: CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o
 foo_taglookup.dylib: CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o
 foo_taglookup.dylib: CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o
 foo_taglookup.dylib: CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o
@@ -149,7 +181,7 @@ foo_taglookup.dylib: libfb2k_sdk.a
 foo_taglookup.dylib: libfb2k_shared.a
 foo_taglookup.dylib: libfb2k_pfc.a
 foo_taglookup.dylib: CMakeFiles/foo_taglookup.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking CXX shared library foo_taglookup.dylib"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/jesthuecarlskov/code/fb2k/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX shared library foo_taglookup.dylib"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/foo_taglookup.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

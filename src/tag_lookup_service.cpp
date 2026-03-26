@@ -133,10 +133,31 @@ std::string BuildMusicBrainzUrl(CURL* curl, const LookupQuery& query, size_t lim
   return url.str();
 }
 
+std::string BuildDiscogsGeneralQuery(const LookupQuery& query) {
+  std::string combined;
+
+  auto append = [&](const std::string& value) {
+    if (value.find_first_not_of(" \t\r\n") == std::string::npos) {
+      return;
+    }
+    if (!combined.empty()) {
+      combined += ' ';
+    }
+    combined += value;
+  };
+
+  append(query.artist);
+  append(query.album);
+  append(query.title);
+  append(query.label);
+  append(query.year);
+  return combined;
+}
+
 std::string BuildDiscogsUrl(CURL* curl, const LookupQuery& query, size_t limit, size_t page,
-                            SearchMode mode) {
+                            SearchMode mode, bool includeTrack, bool useGeneralQuery) {
   std::ostringstream url;
-  url << "https://api.discogs.com/database/search?type=release"
+  url << "https://api.discogs.com/database/search?type=master"
       << "&per_page=" << limit
       << "&page=" << page;
 
@@ -144,18 +165,23 @@ std::string BuildDiscogsUrl(CURL* curl, const LookupQuery& query, size_t limit, 
     if (value.empty()) {
       return;
     }
+    (void)quoted;
     std::string v = value;
-    if (quoted && mode == SearchMode::ExactPhrase) {
-      v = "\"" + v + "\"";
-    }
     url << "&" << key << "=" << UrlEncode(curl, v);
   };
 
   appendParam("artist", query.artist, true);
   appendParam("release_title", query.album, true);
-  appendParam("track", query.title, true);
+  if (includeTrack) {
+    appendParam("track", query.title, true);
+  }
   appendParam("label", query.label, true);
   appendParam("year", query.year, false);
+
+  if (useGeneralQuery) {
+    const std::string generalQuery = BuildDiscogsGeneralQuery(query);
+    appendParam("q", generalQuery, false);
+  }
 
   return url.str();
 }
@@ -354,6 +380,37 @@ std::string ExtractDiscogsReleaseArtist(const nlohmann::json& release) {
     }
   }
   return "";
+}
+
+std::string ExtractDiscogsMasterCoverUrl(const nlohmann::json& master) {
+  if (!master.contains("images") || !master["images"].is_array() || master["images"].empty()) {
+    return "";
+  }
+
+  const auto& first = master["images"][0];
+  const std::string small = JsonFieldToString(first, "uri150");
+  if (!small.empty()) {
+    return small;
+  }
+  return JsonFieldToString(first, "uri");
+}
+
+bool FetchDiscogsMasterJson(CURL* curl, const std::string& masterId, struct curl_slist* headers,
+                            nlohmann::json& outJson) {
+  if (masterId.empty()) {
+    return false;
+  }
+  return PerformJsonRequest(curl, "https://api.discogs.com/masters/" + masterId, outJson,
+                            headers);
+}
+
+bool FetchDiscogsReleaseJson(CURL* curl, const std::string& releaseId, struct curl_slist* headers,
+                             nlohmann::json& outJson) {
+  if (releaseId.empty()) {
+    return false;
+  }
+  return PerformJsonRequest(curl, "https://api.discogs.com/releases/" + releaseId, outJson,
+                            headers);
 }
 
 std::string ExtractDiscogsMediaType(const nlohmann::json& release) {
@@ -674,8 +731,6 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
 
   auto collectDiscogs = [&](SearchMode mode) {
     const size_t page_size = safe_limit;
-    size_t page = 1;
-    size_t total_pages = 1;
 
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Accept: application/json");
@@ -688,66 +743,69 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
       curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     }
 
-    auto resolveDiscogsCoverUrl = [&](const std::string& releaseId) {
-      if (releaseId.empty()) {
+    auto resolveDiscogsMaster = [&](const std::string& masterId, std::string& releaseIdOut,
+                                    std::string& coverUrlOut) {
+      if (masterId.empty()) {
         return std::string();
       }
 
-      nlohmann::json releaseJson;
-      const std::string releaseUrl = "https://api.discogs.com/releases/" + releaseId;
-      if (!PerformJsonRequest(curl, releaseUrl, releaseJson, headers)) {
+      nlohmann::json masterJson;
+      if (!FetchDiscogsMasterJson(curl, masterId, headers, masterJson)) {
         return std::string();
       }
 
-      if (releaseJson.contains("images") && releaseJson["images"].is_array() &&
-          !releaseJson["images"].empty()) {
-        const auto& first = releaseJson["images"][0];
-        const std::string small = JsonFieldToString(first, "uri150");
-        if (!small.empty()) {
-          return small;
-        }
-        const std::string full = JsonFieldToString(first, "uri");
-        if (!full.empty()) {
-          return full;
-        }
+      if (releaseIdOut.empty()) {
+        releaseIdOut = JsonFieldToString(masterJson, "main_release");
+      }
+      if (coverUrlOut.empty()) {
+        coverUrlOut = ExtractDiscogsMasterCoverUrl(masterJson);
       }
 
-      return std::string();
+      return JsonFieldToString(masterJson, "title");
     };
 
-    while (page <= total_pages && out.size() < safe_limit) {
-      const std::string url = BuildDiscogsUrl(curl, query, page_size, page, mode);
-      nlohmann::json json;
-      if (!PerformJsonRequest(curl, url, json, headers)) {
-        break;
-      }
+    auto collectDiscogsAttempt = [&](SearchMode attemptMode, bool includeTrack,
+                                     bool useGeneralQuery) {
+      size_t page = 1;
+      size_t total_pages = 1;
 
-      if (json.contains("pagination") && json["pagination"].is_object() &&
-          json["pagination"].contains("pages")) {
-        if (json["pagination"]["pages"].is_number_unsigned()) {
-          total_pages = json["pagination"]["pages"].get<size_t>();
-        } else if (json["pagination"]["pages"].is_number_integer()) {
-          const auto p = json["pagination"]["pages"].get<long long>();
-          if (p > 0) {
-            total_pages = static_cast<size_t>(p);
+      while (page <= total_pages && out.size() < safe_limit) {
+        const std::string url = BuildDiscogsUrl(curl, query, page_size, page, attemptMode,
+                                                includeTrack, useGeneralQuery);
+        nlohmann::json json;
+        if (!PerformJsonRequest(curl, url, json, headers)) {
+          break;
+        }
+
+        if (json.contains("pagination") && json["pagination"].is_object() &&
+            json["pagination"].contains("pages")) {
+          if (json["pagination"]["pages"].is_number_unsigned()) {
+            total_pages = json["pagination"]["pages"].get<size_t>();
+          } else if (json["pagination"]["pages"].is_number_integer()) {
+            const auto p = json["pagination"]["pages"].get<long long>();
+            if (p > 0) {
+              total_pages = static_cast<size_t>(p);
+            }
           }
         }
-      }
 
-      if (!json.contains("results") || !json["results"].is_array()) {
-        break;
-      }
+        if (!json.contains("results") || !json["results"].is_array()) {
+          break;
+        }
 
-      for (const auto& result : json["results"]) {
+        for (const auto& result : json["results"]) {
         TagResult item;
-        item.release_id = JsonFieldToString(result, "id");
+        const std::string resultType = ToLower(JsonFieldToString(result, "type"));
+        if (resultType == "master") {
+          item.master_id = JsonFieldToString(result, "id");
+        } else {
+          item.master_id = JsonFieldToString(result, "master_id");
+          item.release_id = JsonFieldToString(result, "id");
+        }
         item.date = JsonFieldToString(result, "year");
         item.cover_url = JsonFieldToString(result, "thumb");
         if (item.cover_url.empty()) {
           item.cover_url = JsonFieldToString(result, "cover_image");
-        }
-        if (item.cover_url.empty()) {
-          item.cover_url = resolveDiscogsCoverUrl(item.release_id);
         }
         item.score = 0;
 
@@ -759,6 +817,14 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
         } else {
           item.album = Trim(titleCombined);
           item.artist = query.artist;
+        }
+
+        if (!item.master_id.empty()) {
+          const std::string masterTitle = resolveDiscogsMaster(item.master_id, item.release_id,
+                                                               item.cover_url);
+          if (!masterTitle.empty()) {
+            item.album = masterTitle;
+          }
         }
 
         item.title = query.title;
@@ -779,28 +845,50 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
           continue;
         }
 
-        if (!item.release_id.empty() && seen.insert(item.release_id).second) {
+        const std::string dedupeKey = !item.master_id.empty() ? item.master_id : item.release_id;
+        if (!dedupeKey.empty() && seen.insert(dedupeKey).second) {
           out.push_back(std::move(item));
         }
 
         if (out.size() >= safe_limit) {
           break;
         }
-      }
+        }
 
-      ++page;
-      if (page > 20) {
-        break;
-      }
-    }
-
-      if (headers != nullptr) {
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, nullptr);
-        curl_slist_free_all(headers);
+        ++page;
+        if (page > 20) {
+          break;
+        }
       }
     };
 
-    if (query.provider == SearchProvider::Discogs) {
+    const bool haveAlbum = !query.album.empty();
+    const bool haveTrack = !query.title.empty();
+
+    collectDiscogsAttempt(mode, !haveAlbum && haveTrack, false);
+    if (out.empty() && haveTrack) {
+      collectDiscogsAttempt(mode, false, false);
+    }
+    if (out.empty()) {
+      collectDiscogsAttempt(mode, false, true);
+    }
+    if (out.empty() && mode == SearchMode::ExactPhrase) {
+        collectDiscogsAttempt(SearchMode::Tokenized, !haveAlbum && haveTrack, false);
+        if (out.empty() && haveTrack) {
+          collectDiscogsAttempt(SearchMode::Tokenized, false, false);
+        }
+        if (out.empty()) {
+          collectDiscogsAttempt(SearchMode::Tokenized, false, true);
+        }
+    }
+
+    if (headers != nullptr) {
+      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, nullptr);
+      curl_slist_free_all(headers);
+    }
+    };
+
+    if (query.provider == LookupProvider::Discogs) {
       collectDiscogs(query.search_mode);
     } else {
       collectMusicBrainz(query.search_mode);
@@ -832,7 +920,7 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
   TracklistResult out;
 
   try {
-    if (result.release_id.empty()) {
+    if (result.release_id.empty() && result.master_id.empty()) {
       return out;
     }
 
@@ -852,13 +940,12 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
 
     std::string url;
 
-    if (query.provider == SearchProvider::Discogs) {
+    if (query.provider == LookupProvider::Discogs) {
       const char* discogsToken = std::getenv("DISCOGS_TOKEN");
       if (discogsToken != nullptr && discogsToken[0] != '\0') {
         std::string auth = std::string("Authorization: Discogs token=") + discogsToken;
         headers = curl_slist_append(headers, auth.c_str());
       }
-      url = "https://api.discogs.com/releases/" + result.release_id;
     } else {
       // MusicBrainz: fetch release by ID with recordings and artist credits.
       url = "https://musicbrainz.org/ws/2/release/" + result.release_id +
@@ -866,7 +953,24 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
     }
 
     nlohmann::json json;
-    const bool ok = PerformJsonRequest(curl, url, json, headers);
+    nlohmann::json discogsMasterJson;
+    bool ok = false;
+    if (query.provider == LookupProvider::Discogs) {
+      std::string discogsReleaseId = result.release_id;
+      if (!result.master_id.empty()) {
+        FetchDiscogsMasterJson(curl, result.master_id, headers, discogsMasterJson);
+        if (discogsReleaseId.empty()) {
+          discogsReleaseId = JsonFieldToString(discogsMasterJson, "main_release");
+        }
+      }
+      ok = FetchDiscogsReleaseJson(curl, discogsReleaseId, headers, json);
+      if (!ok && !discogsMasterJson.is_null()) {
+        json = discogsMasterJson;
+        ok = true;
+      }
+    } else {
+      ok = PerformJsonRequest(curl, url, json, headers);
+    }
 
     if (headers != nullptr) {
       curl_slist_free_all(headers);
@@ -877,10 +981,20 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
       return out;
     }
 
-    if (query.provider == SearchProvider::Discogs) {
+    if (query.provider == LookupProvider::Discogs) {
       // Album-level artist.
-      out.albumArtist = ExtractDiscogsReleaseArtist(json);
-      out.genre = JoinJsonStringArray(json.value("genres", nlohmann::json::array()));
+      const nlohmann::json& trackSource = discogsMasterJson.is_object() ? discogsMasterJson : json;
+      out.albumArtist = ExtractDiscogsReleaseArtist(trackSource);
+      if (out.albumArtist.empty()) {
+        out.albumArtist = ExtractDiscogsReleaseArtist(json);
+      }
+      out.genre = JoinJsonStringArray(trackSource.value("genres", nlohmann::json::array()));
+      if (out.genre.empty()) {
+        out.genre = JoinJsonStringArray(trackSource.value("styles", nlohmann::json::array()));
+      }
+      if (out.genre.empty()) {
+        out.genre = JoinJsonStringArray(json.value("genres", nlohmann::json::array()));
+      }
       if (out.genre.empty()) {
         out.genre = JoinJsonStringArray(json.value("styles", nlohmann::json::array()));
       }
@@ -898,8 +1012,8 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
       // Per-track data from tracklist[].
       const std::string releaseMediaType = ExtractDiscogsMediaType(json);
       size_t trackOrdinal = 1;
-      if (json.contains("tracklist") && json["tracklist"].is_array()) {
-        for (const auto& track : json["tracklist"]) {
+      if (trackSource.contains("tracklist") && trackSource["tracklist"].is_array()) {
+        for (const auto& track : trackSource["tracklist"]) {
           const std::string type = JsonFieldToString(track, "type_");
           if (!(type.empty() || type == "track" || type == "index")) {
             continue;
@@ -1007,7 +1121,8 @@ std::string TagLookupService::ResolvePropagationTitle(const LookupQuery& query,
   }
 
   try {
-    if (query.provider == SearchProvider::Discogs && !result.release_id.empty()) {
+    if (query.provider == LookupProvider::Discogs &&
+      (!result.release_id.empty() || !result.master_id.empty())) {
       CURL* curl = curl_easy_init();
       if (curl == nullptr) {
         return query.title;
@@ -1027,9 +1142,23 @@ std::string TagLookupService::ResolvePropagationTitle(const LookupQuery& query,
         headers = curl_slist_append(headers, auth.c_str());
       }
 
-      const std::string url = "https://api.discogs.com/releases/" + result.release_id;
       nlohmann::json json;
-      const bool ok = PerformJsonRequest(curl, url, json, headers);
+      nlohmann::json masterJson;
+      bool ok = false;
+      if (!result.master_id.empty()) {
+        FetchDiscogsMasterJson(curl, result.master_id, headers, masterJson);
+      }
+      std::string releaseId = result.release_id;
+      if (releaseId.empty() && masterJson.is_object()) {
+        releaseId = JsonFieldToString(masterJson, "main_release");
+      }
+      if (!releaseId.empty()) {
+        ok = FetchDiscogsReleaseJson(curl, releaseId, headers, json);
+      }
+      if (!ok && masterJson.is_object()) {
+        json = masterJson;
+        ok = true;
+      }
 
       if (headers != nullptr) {
         curl_slist_free_all(headers);
@@ -1052,7 +1181,8 @@ std::string TagLookupService::ResolvePropagationTitle(const LookupQuery& query,
 std::string TagLookupService::ResolvePropagationArtist(const LookupQuery& query,
                                                       const TagResult& result) const {
   try {
-    if (query.provider == SearchProvider::Discogs && !result.release_id.empty()) {
+    if (query.provider == LookupProvider::Discogs &&
+      (!result.release_id.empty() || !result.master_id.empty())) {
       CURL* curl = curl_easy_init();
       if (curl == nullptr) {
         return !query.artist.empty() ? query.artist : result.artist;
@@ -1072,9 +1202,23 @@ std::string TagLookupService::ResolvePropagationArtist(const LookupQuery& query,
         headers = curl_slist_append(headers, auth.c_str());
       }
 
-      const std::string url = "https://api.discogs.com/releases/" + result.release_id;
       nlohmann::json json;
-      const bool ok = PerformJsonRequest(curl, url, json, headers);
+      nlohmann::json masterJson;
+      bool ok = false;
+      if (!result.master_id.empty()) {
+        FetchDiscogsMasterJson(curl, result.master_id, headers, masterJson);
+      }
+      std::string releaseId = result.release_id;
+      if (releaseId.empty() && masterJson.is_object()) {
+        releaseId = JsonFieldToString(masterJson, "main_release");
+      }
+      if (!releaseId.empty()) {
+        ok = FetchDiscogsReleaseJson(curl, releaseId, headers, json);
+      }
+      if (!ok && masterJson.is_object()) {
+        json = masterJson;
+        ok = true;
+      }
 
       if (headers != nullptr) {
         curl_slist_free_all(headers);

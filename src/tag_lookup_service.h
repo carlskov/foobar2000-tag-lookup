@@ -10,7 +10,7 @@ enum class SearchMode {
   Tokenized,
 };
 
-enum class SearchProvider {
+enum class LookupProvider {
   MusicBrainz,
   Discogs,
 };
@@ -22,7 +22,7 @@ struct LookupQuery {
   std::string title;
   std::string year;
   SearchMode search_mode = SearchMode::ExactPhrase;
-  SearchProvider provider = SearchProvider::MusicBrainz;
+  LookupProvider provider = LookupProvider::MusicBrainz;
   bool overwrite_title_on_propagation = false;
 };
 
@@ -34,6 +34,7 @@ struct TagResult {
   std::string date;
   std::string cover_url;
   std::string recording_id;
+  std::string master_id;
   std::string release_id;
   int score = 0;
 };

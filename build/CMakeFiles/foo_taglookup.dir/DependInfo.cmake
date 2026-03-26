@@ -8,8 +8,10 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/Users/jesthuecarlskov/code/fb2k/src/album_art_service.cpp" "CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o" "gcc" "CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o.d"
   "/Users/jesthuecarlskov/code/fb2k/src/component_main.cpp" "CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o" "gcc" "CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o.d"
   "/Users/jesthuecarlskov/code/fb2k/src/tag_lookup_service.cpp" "CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o" "gcc" "CMakeFiles/foo_taglookup.dir/src/tag_lookup_service.cpp.o.d"
+  "/Users/jesthuecarlskov/code/fb2k/src/album_art_selector_mac.mm" "CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o" "gcc" "CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o.d"
   "/Users/jesthuecarlskov/code/fb2k/src/match_selector_mac.mm" "CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o" "gcc" "CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o.d"
   "/Users/jesthuecarlskov/code/fb2k/src/search_input_mac.mm" "CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o" "gcc" "CMakeFiles/foo_taglookup.dir/src/search_input_mac.mm.o.d"
   )

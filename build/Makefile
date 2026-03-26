@@ -2677,6 +2677,38 @@ sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/fb2k_pfc.dir/build.make CMakeFiles/fb2k_pfc.dir/sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.cpp.s
 .PHONY : sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.cpp.s
 
+src/album_art_selector_mac.o: src/album_art_selector_mac.mm.o
+.PHONY : src/album_art_selector_mac.o
+
+# target to build an object file
+src/album_art_selector_mac.mm.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_taglookup.dir/build.make CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o
+.PHONY : src/album_art_selector_mac.mm.o
+
+src/album_art_service.o: src/album_art_service.cpp.o
+.PHONY : src/album_art_service.o
+
+# target to build an object file
+src/album_art_service.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_taglookup.dir/build.make CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o
+.PHONY : src/album_art_service.cpp.o
+
+src/album_art_service.i: src/album_art_service.cpp.i
+.PHONY : src/album_art_service.i
+
+# target to preprocess a source file
+src/album_art_service.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_taglookup.dir/build.make CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.i
+.PHONY : src/album_art_service.cpp.i
+
+src/album_art_service.s: src/album_art_service.cpp.s
+.PHONY : src/album_art_service.s
+
+# target to generate assembly for a file
+src/album_art_service.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo_taglookup.dir/build.make CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.s
+.PHONY : src/album_art_service.cpp.s
+
 src/component_main.o: src/component_main.cpp.o
 .PHONY : src/component_main.o
 
@@ -3066,6 +3098,10 @@ help:
 	@echo "... sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.o"
 	@echo "... sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.i"
 	@echo "... sdk/foobar2000-sdk-2025-03-07/pfc/win-objects.s"
+	@echo "... src/album_art_selector_mac.o"
+	@echo "... src/album_art_service.o"
+	@echo "... src/album_art_service.i"
+	@echo "... src/album_art_service.s"
 	@echo "... src/component_main.o"
 	@echo "... src/component_main.i"
 	@echo "... src/component_main.s"

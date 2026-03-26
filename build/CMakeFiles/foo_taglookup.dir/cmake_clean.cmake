@@ -1,4 +1,8 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o"
+  "CMakeFiles/foo_taglookup.dir/src/album_art_selector_mac.mm.o.d"
+  "CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o"
+  "CMakeFiles/foo_taglookup.dir/src/album_art_service.cpp.o.d"
   "CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o"
   "CMakeFiles/foo_taglookup.dir/src/component_main.cpp.o.d"
   "CMakeFiles/foo_taglookup.dir/src/match_selector_mac.mm.o"
