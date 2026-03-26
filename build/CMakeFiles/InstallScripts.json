@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/jesthuecarlskov/code/fb2k/build/cmake_install.cmake",
-		"/Users/jesthuecarlskov/code/fb2k/build/_deps/nlohmann_json-build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
