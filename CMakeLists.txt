@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
 project(foo_taglookup LANGUAGES C CXX OBJC OBJCXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -159,4 +161,26 @@ if(APPLE)
   if(APPKIT_FRAMEWORK)
     target_link_libraries(foo_taglookup PRIVATE ${APPKIT_FRAMEWORK})
   endif()
+endif()
+
+if(BUILD_TESTING)
+  add_executable(tag_lookup_service_tests
+    tests/tag_lookup_service_tests.cpp
+  )
+  target_include_directories(tag_lookup_service_tests PRIVATE src)
+  target_link_libraries(tag_lookup_service_tests PRIVATE
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+  )
+  add_test(NAME tag_lookup_service_tests COMMAND tag_lookup_service_tests)
+
+  add_executable(album_art_service_tests
+    tests/album_art_service_tests.cpp
+  )
+  target_include_directories(album_art_service_tests PRIVATE src)
+  target_link_libraries(album_art_service_tests PRIVATE
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+  )
+  add_test(NAME album_art_service_tests COMMAND album_art_service_tests)
 endif()

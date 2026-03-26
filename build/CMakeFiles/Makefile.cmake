@@ -28,6 +28,9 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/opt/homebrew/share/cmake/Modules/CMakePackageConfigHelpers.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInformation.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake"
+  "/opt/homebrew/share/cmake/Modules/CTest.cmake"
+  "/opt/homebrew/share/cmake/Modules/CTestTargets.cmake"
+  "/opt/homebrew/share/cmake/Modules/CTestUseLaunchers.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/AppleClang-C.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/AppleClang-CXX.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/AppleClang-OBJC.cmake"
@@ -37,6 +40,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/opt/homebrew/share/cmake/Modules/Compiler/Clang-OBJCXX.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/Clang.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake"
+  "/opt/homebrew/share/cmake/Modules/DartConfiguration.tcl.in"
   "/opt/homebrew/share/cmake/Modules/ExternalProject.cmake"
   "/opt/homebrew/share/cmake/Modules/ExternalProject/shared_internal_commands.cmake"
   "/opt/homebrew/share/cmake/Modules/FetchContent.cmake"
@@ -73,6 +77,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/opt/homebrew/share/cmake/Modules/Platform/UnixPaths.cmake"
   "/opt/homebrew/share/cmake/Modules/SelectLibraryConfigurations.cmake"
   "/opt/homebrew/share/cmake/Modules/WriteBasicConfigVersionFile.cmake"
+  "/opt/homebrew/share/cmake/Templates/CTestScript.cmake.in"
   )
 
 # The corresponding makefile is:
@@ -83,6 +88,8 @@ set(CMAKE_MAKEFILE_OUTPUTS
 
 # Byproducts of CMake generate step:
 set(CMAKE_MAKEFILE_PRODUCTS
+  "DartConfiguration.tcl"
+  "CMakeFiles/CTestScript.cmake"
   "_deps/nlohmann_json-subbuild/CMakeLists.txt"
   "CMakeFiles/CMakeDirectoryInformation.cmake"
   "_deps/nlohmann_json-build/nlohmann_json.pc"
@@ -93,9 +100,39 @@ set(CMAKE_MAKEFILE_PRODUCTS
 
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
+  "CMakeFiles/Experimental.dir/DependInfo.cmake"
+  "CMakeFiles/Nightly.dir/DependInfo.cmake"
+  "CMakeFiles/Continuous.dir/DependInfo.cmake"
+  "CMakeFiles/NightlyMemoryCheck.dir/DependInfo.cmake"
+  "CMakeFiles/NightlyStart.dir/DependInfo.cmake"
+  "CMakeFiles/NightlyUpdate.dir/DependInfo.cmake"
+  "CMakeFiles/NightlyConfigure.dir/DependInfo.cmake"
+  "CMakeFiles/NightlyBuild.dir/DependInfo.cmake"
+  "CMakeFiles/NightlyTest.dir/DependInfo.cmake"
+  "CMakeFiles/NightlyCoverage.dir/DependInfo.cmake"
+  "CMakeFiles/NightlyMemCheck.dir/DependInfo.cmake"
+  "CMakeFiles/NightlySubmit.dir/DependInfo.cmake"
+  "CMakeFiles/ExperimentalStart.dir/DependInfo.cmake"
+  "CMakeFiles/ExperimentalUpdate.dir/DependInfo.cmake"
+  "CMakeFiles/ExperimentalConfigure.dir/DependInfo.cmake"
+  "CMakeFiles/ExperimentalBuild.dir/DependInfo.cmake"
+  "CMakeFiles/ExperimentalTest.dir/DependInfo.cmake"
+  "CMakeFiles/ExperimentalCoverage.dir/DependInfo.cmake"
+  "CMakeFiles/ExperimentalMemCheck.dir/DependInfo.cmake"
+  "CMakeFiles/ExperimentalSubmit.dir/DependInfo.cmake"
+  "CMakeFiles/ContinuousStart.dir/DependInfo.cmake"
+  "CMakeFiles/ContinuousUpdate.dir/DependInfo.cmake"
+  "CMakeFiles/ContinuousConfigure.dir/DependInfo.cmake"
+  "CMakeFiles/ContinuousBuild.dir/DependInfo.cmake"
+  "CMakeFiles/ContinuousTest.dir/DependInfo.cmake"
+  "CMakeFiles/ContinuousCoverage.dir/DependInfo.cmake"
+  "CMakeFiles/ContinuousMemCheck.dir/DependInfo.cmake"
+  "CMakeFiles/ContinuousSubmit.dir/DependInfo.cmake"
   "CMakeFiles/fb2k_pfc.dir/DependInfo.cmake"
   "CMakeFiles/fb2k_shared.dir/DependInfo.cmake"
   "CMakeFiles/fb2k_sdk.dir/DependInfo.cmake"
   "CMakeFiles/fb2k_component_client.dir/DependInfo.cmake"
   "CMakeFiles/foo_taglookup.dir/DependInfo.cmake"
+  "CMakeFiles/tag_lookup_service_tests.dir/DependInfo.cmake"
+  "CMakeFiles/album_art_service_tests.dir/DependInfo.cmake"
   )

@@ -73,6 +73,17 @@ Install it by copying to:
 
 - `~/Library/Application Support/foobar2000-v2/components`
 
+## Run tests
+
+After configuring the project, run:
+
+```bash
+cmake --build build --target tag_lookup_service_tests album_art_service_tests
+ctest --test-dir build --output-on-failure
+```
+
+The tests cover the provider-specific URL building and parsing helpers used by the tag lookup and album art services.
+
 If your SDK is not at `sdk/foobar2000-sdk-*`, pass it explicitly:
 
 ```bash
