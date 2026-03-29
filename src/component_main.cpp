@@ -116,12 +116,13 @@ class ReleaseTagPropagationFilter : public file_info_filter {
                               std::string totalTracks,
                               std::string totalDiscs,
                               std::string genre,
+                              std::string label,
                               const taglookup::TagResult& result,
                               std::vector<taglookup::TrackInfo> tracks,
                               bool overwriteTitle)
       : album_artist_(std::move(albumArtist)), total_tracks_(std::move(totalTracks)),
-        total_discs_(std::move(totalDiscs)), genre_(std::move(genre)), result_(result),
-        tracks_(std::move(tracks)), overwrite_title_(overwriteTitle) {
+        total_discs_(std::move(totalDiscs)), genre_(std::move(genre)), label_(std::move(label)),
+        result_(result), tracks_(std::move(tracks)), overwrite_title_(overwriteTitle) {
     // Pre-build a map from each handle's raw pointer to its position in the selection.
     // apply_filter receives the same pointer, allowing per-file track resolution.
     for (size_t i = 0; i < data.get_count(); ++i) {
@@ -165,7 +166,7 @@ class ReleaseTagPropagationFilter : public file_info_filter {
     setIfNonEmpty("ALBUM ARTIST", album_artist_);
     setIfNonEmpty("ALBUM", result_.album);
     setIfNonEmpty("DATE", result_.date);
-    setIfNonEmpty("LABEL", result_.label);
+    setIfNonEmpty("LABEL", label_);
     setIfNonEmpty("TOTALTRACKS", total_tracks_);
     setIfNonEmpty("TOTALDISCS", total_discs_);
     setIfNonEmpty("GENRE", genre_);
@@ -190,6 +191,7 @@ class ReleaseTagPropagationFilter : public file_info_filter {
   std::string total_tracks_;
   std::string total_discs_;
   std::string genre_;
+  std::string label_;
   taglookup::TagResult result_;
   std::vector<taglookup::TrackInfo> tracks_;
   bool overwrite_title_ = false;
@@ -201,13 +203,14 @@ void PropagateTagsToSelection(const pfc::list_base_const_t<metadb_handle_ptr>& d
                               const std::string& totalTracks,
                               const std::string& totalDiscs,
                               const std::string& genre,
+                              const std::string& label,
                               const taglookup::TagResult& result,
                               const std::vector<taglookup::TrackInfo>& tracks,
                               bool overwriteTitle) {
   const auto wndParent = core_api::get_main_window();
   auto filter = fb2k::service_new<ReleaseTagPropagationFilter>(data, albumArtist, totalTracks,
-                                                               totalDiscs, genre, result, tracks,
-                                                               overwriteTitle);
+                                                               totalDiscs, genre, label, result,
+                                                               tracks, overwriteTitle);
 
   auto notify = fb2k::makeCompletionNotify([](unsigned code) {
     FB2K_console_formatter() << "Tag propagation finished, code: " << code;
@@ -442,9 +445,11 @@ class ContextTagLookup : public contextmenu_item_simple {
       const taglookup::TracklistResult tracklistResult = service.FetchTracklist(query, result);
       const std::string albumArtist =
         tracklistResult.albumArtist.empty() ? result.artist : tracklistResult.albumArtist;
+      const std::string effectiveLabel =
+        tracklistResult.label.empty() ? result.label : tracklistResult.label;
 
       PropagateTagsToSelection(data, albumArtist, tracklistResult.totalTracks,
-                   tracklistResult.totalDiscs, tracklistResult.genre, result,
+                   tracklistResult.totalDiscs, tracklistResult.genre, effectiveLabel, result,
                    tracklistResult.tracks, query.overwrite_title_on_propagation);
 
       pfc::string_formatter msg;

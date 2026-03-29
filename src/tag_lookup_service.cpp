@@ -947,9 +947,9 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
         headers = curl_slist_append(headers, auth.c_str());
       }
     } else {
-      // MusicBrainz: fetch release by ID with recordings and artist credits.
+      // MusicBrainz: fetch release by ID with recordings, artist credits, and label info.
       url = "https://musicbrainz.org/ws/2/release/" + result.release_id +
-            "?inc=recordings+artist-credits&fmt=json";
+            "?inc=recordings+artist-credits+labels&fmt=json";
     }
 
     nlohmann::json json;
@@ -1052,9 +1052,18 @@ TracklistResult TagLookupService::FetchTracklist(const LookupQuery& query,
       if (totalDiscs > 0) {
         out.totalDiscs = std::to_string(totalDiscs);
       }
+
+      // Extract label from full Discogs release data (more reliable than search snippet).
+      if (json.contains("labels") && json["labels"].is_array() && !json["labels"].empty()) {
+        const auto& firstLabel = json["labels"][0];
+        if (firstLabel.is_object()) {
+          out.label = firstLabel.value("name", "");
+        }
+      }
     } else {
       // MusicBrainz album-level artist.
       out.albumArtist = ExtractPrimaryArtist(json);
+      out.label = ExtractPrimaryLabel(json);
       if (json.contains("tags") && json["tags"].is_array() && !json["tags"].empty()) {
         out.genre = json["tags"][0].value("name", "");
       }

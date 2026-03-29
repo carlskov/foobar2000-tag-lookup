@@ -54,6 +54,7 @@ struct TracklistResult {
   std::string totalTracks;        // release-level total tracks
   std::string totalDiscs;         // release-level total discs
   std::string genre;              // release-level genre
+  std::string label;              // release-level label; empty if not resolved
   std::vector<TrackInfo> tracks;  // ordered by track position in the release
 };
 
