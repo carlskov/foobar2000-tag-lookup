@@ -70,6 +70,247 @@ void TestLooksLikeImageBytesRecognizesCommonFormats() {
          "HTML should not be treated as image data");
 }
 
+// ---------------------------------------------------------------------------
+// JsonToString (album_art_service)
+// ---------------------------------------------------------------------------
+
+void TestAlbumArtJsonToStringConvertsVariousTypes() {
+  auto jsonString = nlohmann::json::parse(R"json("hello")json");
+  Expect(taglookup::JsonToString(jsonString) == "hello",
+         "JsonToString should return string value");
+
+  auto jsonInt = nlohmann::json::parse(R"json(42)json");
+  Expect(taglookup::JsonToString(jsonInt) == "42",
+         "JsonToString should convert integer to string");
+
+  nlohmann::json jsonUnsigned = 4294967295U;
+  Expect(taglookup::JsonToString(jsonUnsigned) == "4294967295",
+         "JsonToString should convert unsigned integer to string");
+
+  nlohmann::json jsonDouble = 3.0;
+  Expect(taglookup::JsonToString(jsonDouble) == "3.000000",
+         "JsonToString should convert double to string");
+
+  auto jsonNull = nlohmann::json::parse(R"json(null)json");
+  Expect(taglookup::JsonToString(jsonNull) == "",
+         "JsonToString should return empty string for null");
+}
+
+// ---------------------------------------------------------------------------
+// JsonFieldToString (album_art_service)
+// ---------------------------------------------------------------------------
+
+void TestAlbumArtJsonFieldToStringReturnsFieldValue() {
+  const auto json = nlohmann::json::parse(R"json({ "name": "Test", "count": 5 })json");
+  Expect(taglookup::JsonFieldToString(json, "name") == "Test",
+         "JsonFieldToString should return string field value");
+  Expect(taglookup::JsonFieldToString(json, "count") == "5",
+         "JsonFieldToString should convert numeric field to string");
+  Expect(taglookup::JsonFieldToString(json, "missing") == "",
+         "JsonFieldToString should return empty for missing field");
+}
+
+// ---------------------------------------------------------------------------
+// ToLower (album_art_service)
+// ---------------------------------------------------------------------------
+
+void TestAlbumArtToLowerConvertsCharacters() {
+  Expect(taglookup::ToLower("HELLO WORLD") == "hello world",
+         "ToLower should convert uppercase to lowercase");
+  Expect(taglookup::ToLower("Already Lower") == "already lower",
+         "ToLower should leave lowercase unchanged");
+  Expect(taglookup::ToLower("") == "",
+         "ToLower should handle empty string");
+  Expect(taglookup::ToLower("MiXeD CaSe") == "mixed case",
+         "ToLower should handle mixed case");
+}
+
+// ---------------------------------------------------------------------------
+// ExtensionFromUrl
+// ---------------------------------------------------------------------------
+
+void TestExtensionFromUrlExtractsExtension() {
+  Expect(taglookup::ExtensionFromUrl("https://example.com/cover.jpg") == ".jpg",
+         "ExtensionFromUrl should extract .jpg");
+  Expect(taglookup::ExtensionFromUrl("https://example.com/cover.JPEG") == ".jpg",
+         "ExtensionFromUrl should normalize .JPEG to .jpg");
+  Expect(taglookup::ExtensionFromUrl("https://example.com/cover.png") == ".png",
+         "ExtensionFromUrl should extract .png");
+  Expect(taglookup::ExtensionFromUrl("https://example.com/cover.webp") == ".webp",
+         "ExtensionFromUrl should extract .webp");
+  Expect(taglookup::ExtensionFromUrl("https://example.com/cover") == "",
+         "ExtensionFromUrl should return empty for no extension");
+  Expect(taglookup::ExtensionFromUrl("https://example.com/cover?size=large") == "",
+         "ExtensionFromUrl should ignore query string");
+  Expect(taglookup::ExtensionFromUrl("https://example.com/cover.txt") == "",
+         "ExtensionFromUrl should return empty for unsupported extension");
+}
+
+// ---------------------------------------------------------------------------
+// JoinJsonStringArray (album_art_service)
+// ---------------------------------------------------------------------------
+
+void TestAlbumArtJoinJsonStringArrayJoinsWithSemicolon() {
+  const auto json = nlohmann::json::parse(R"json(["Rock", "Alternative", "Indie"])json");
+  Expect(taglookup::JoinJsonStringArray(json) == "Rock; Alternative; Indie",
+         "JoinJsonStringArray should join with '; '");
+}
+
+void TestAlbumArtJoinJsonStringArraySkipsNonStrings() {
+  const auto json = nlohmann::json::parse(R"json(["Rock", 42, 3.5, "Indie"])json");
+  Expect(taglookup::JoinJsonStringArray(json) == "Rock; 42; 3.500000; Indie",
+         "JoinJsonStringArray should convert numbers to string");
+}
+
+void TestAlbumArtJoinJsonStringArrayReturnsEmptyForNonArray() {
+  const auto json = nlohmann::json::parse(R"json("not an array")json");
+  Expect(taglookup::JoinJsonStringArray(json) == "",
+         "JoinJsonStringArray should return empty for non-array");
+  Expect(taglookup::JoinJsonStringArray(nlohmann::json::array()) == "",
+         "JoinJsonStringArray should return empty for empty array");
+}
+
+// ---------------------------------------------------------------------------
+// JoinArtistNames (album_art_service)
+// ---------------------------------------------------------------------------
+
+void TestAlbumArtJoinArtistNamesConcatenatesWithComma() {
+  const auto json = nlohmann::json::parse(R"json([
+    { "name": "Artist A" },
+    { "name": "Artist B" }
+  ])json");
+  Expect(taglookup::JoinArtistNames(json) == "Artist A, Artist B",
+         "JoinArtistNames should join multiple artists with ', '");
+}
+
+void TestAlbumArtJoinArtistNamesReturnsEmptyForNonArray() {
+  const auto json = nlohmann::json::parse(R"json("not artists")json");
+  Expect(taglookup::JoinArtistNames(json) == "",
+         "JoinArtistNames should return empty for non-array");
+  Expect(taglookup::JoinArtistNames(nlohmann::json::array()) == "",
+         "JoinArtistNames should return empty for empty array");
+}
+
+void TestAlbumArtJoinArtistNamesSkipsMissingNames() {
+  const auto json = nlohmann::json::parse(R"json([
+    { "name": "Artist A" },
+    { "other": "field" }
+  ])json");
+  Expect(taglookup::JoinArtistNames(json) == "Artist A",
+         "JoinArtistNames should skip entries without name field");
+}
+
+// ---------------------------------------------------------------------------
+// BuildMusicBrainzUrl
+// ---------------------------------------------------------------------------
+
+void TestBuildMusicBrainzUrlIncludesRequiredParameters() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+  query.title = "Paranoid Android";
+  query.label = "Parlophone";
+  query.year = "1997";
+
+  const std::string url = taglookup::BuildMusicBrainzUrl(
+      curl, query, 10, taglookup::SearchMode::ExactPhrase);
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("musicbrainz.org") != std::string::npos,
+         "URL should target MusicBrainz");
+  Expect(url.find("fmt=json") != std::string::npos,
+         "URL should request JSON format");
+  Expect(url.find("inc=cover-art-archive") != std::string::npos,
+         "URL should include cover-art-archive");
+  Expect(url.find("limit=10") != std::string::npos,
+         "URL should include limit parameter");
+}
+
+void TestBuildMusicBrainzUrlTokenizedModeOmitsQuotes() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+
+  const std::string exactUrl = taglookup::BuildMusicBrainzUrl(
+      curl, query, 10, taglookup::SearchMode::ExactPhrase);
+  const std::string tokenizedUrl = taglookup::BuildMusicBrainzUrl(
+      curl, query, 10, taglookup::SearchMode::Tokenized);
+  curl_easy_cleanup(curl);
+
+  Expect(exactUrl.find("%22") != std::string::npos,
+         "ExactPhrase URL should URL-encode quotes");
+  Expect(tokenizedUrl.find("%22") == std::string::npos,
+         "Tokenized URL should omit quotes");
+}
+
+void TestBuildMusicBrainzUrlHandlesEmptyQuery() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+
+  const std::string url = taglookup::BuildMusicBrainzUrl(
+      curl, query, 10, taglookup::SearchMode::ExactPhrase);
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("release%3A%22%22") != std::string::npos,
+         "Empty query should include empty release clause (URL-encoded)");
+}
+
+// ---------------------------------------------------------------------------
+// BuildDiscogsSearchUrl - additional tests
+// ---------------------------------------------------------------------------
+
+void TestBuildDiscogsSearchUrlIncludesTrackWhenRequested() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+  query.title = "Paranoid Android";
+
+  const std::string urlWithTrack = taglookup::BuildDiscogsSearchUrl(
+      curl, query, 10, taglookup::SearchMode::ExactPhrase, true, false);
+  const std::string urlWithoutTrack = taglookup::BuildDiscogsSearchUrl(
+      curl, query, 10, taglookup::SearchMode::ExactPhrase, false, false);
+  curl_easy_cleanup(curl);
+
+  Expect(urlWithTrack.find("track=") != std::string::npos,
+         "URL should include track parameter when includeTrack=true");
+  Expect(urlWithoutTrack.find("track=") == std::string::npos,
+         "URL should omit track parameter when includeTrack=false");
+}
+
+// ---------------------------------------------------------------------------
+// GuessExtension - additional tests
+// ---------------------------------------------------------------------------
+
+void TestGuessExtensionUsesExtensionHint() {
+  Expect(taglookup::AlbumArtService::GuessExtension("url", "", ".png") == ".png",
+         "GuessExtension should return hint when provided");
+}
+
+void TestGuessExtensionDerivesFromContentType() {
+  Expect(taglookup::AlbumArtService::GuessExtension("url", "image/png", "") == ".png",
+         "GuessExtension should derive .png from content type");
+  Expect(taglookup::AlbumArtService::GuessExtension("url", "image/webp", "") == ".webp",
+         "GuessExtension should derive .webp from content type");
+  Expect(taglookup::AlbumArtService::GuessExtension("url", "application/octet-stream", "") == ".jpg",
+         "GuessExtension should default to .jpg for unknown content type");
+}
+
+void TestGuessExtensionDerivesFromUrl() {
+  Expect(taglookup::AlbumArtService::GuessExtension("cover.png", "", "") == ".png",
+         "GuessExtension should derive extension from URL");
+}
+
 }  // namespace
 
 int main() {
@@ -80,6 +321,24 @@ int main() {
     TestGuessExtensionNormalizesJpegToJpg();
     TestExtractDiscogsMasterCoverUrlPrefersFullSizeImage();
     TestLooksLikeImageBytesRecognizesCommonFormats();
+
+    TestAlbumArtJsonToStringConvertsVariousTypes();
+    TestAlbumArtJsonFieldToStringReturnsFieldValue();
+    TestAlbumArtToLowerConvertsCharacters();
+    TestExtensionFromUrlExtractsExtension();
+    TestAlbumArtJoinJsonStringArrayJoinsWithSemicolon();
+    TestAlbumArtJoinJsonStringArraySkipsNonStrings();
+    TestAlbumArtJoinJsonStringArrayReturnsEmptyForNonArray();
+    TestAlbumArtJoinArtistNamesConcatenatesWithComma();
+    TestAlbumArtJoinArtistNamesReturnsEmptyForNonArray();
+    TestAlbumArtJoinArtistNamesSkipsMissingNames();
+    TestBuildMusicBrainzUrlIncludesRequiredParameters();
+    TestBuildMusicBrainzUrlTokenizedModeOmitsQuotes();
+    TestBuildMusicBrainzUrlHandlesEmptyQuery();
+    TestBuildDiscogsSearchUrlIncludesTrackWhenRequested();
+    TestGuessExtensionUsesExtensionHint();
+    TestGuessExtensionDerivesFromContentType();
+    TestGuessExtensionDerivesFromUrl();
   } catch (const std::exception& e) {
     std::cerr << e.what() << '\n';
     curl_global_cleanup();
