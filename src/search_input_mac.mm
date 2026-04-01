@@ -84,6 +84,7 @@ std::optional<QueryPromptResult> RunQueryPrompt(NSString* messageText,
                                  pullsDown:NO];
   [providerPopup addItemWithTitle:@"MusicBrainz"];
   [providerPopup addItemWithTitle:@"Discogs"];
+  [providerPopup addItemWithTitle:@"AlbumArtExchange"];
   [providerPopup selectItemAtIndex:providerIndex];
 
   NSTextField* artistInput = MakeInput(ToNSString(artist), 220);
@@ -224,7 +225,8 @@ std::optional<AlbumArtQuery> PromptForAlbumArtQuery(const AlbumArtQuery& seed,
     query.year = result->year;
     query.search_mode = result->searchMode;
     query.provider = (result->providerIndex == 1) ? AlbumArtProvider::Discogs
-                                                  : AlbumArtProvider::MusicBrainz;
+                                    : (result->providerIndex == 2) ? AlbumArtProvider::AlbumArtExchange
+                                                                  : AlbumArtProvider::MusicBrainz;
 
     return query;
   }

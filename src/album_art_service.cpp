@@ -257,6 +257,145 @@ std::string ExtractDiscogsMasterCoverUrl(const nlohmann::json& master) {
   return image;
 }
 
+std::string BuildAlbumArtExchangeSearchUrl(CURL* curl, const AlbumArtQuery& query,
+                                           size_t page) {
+  std::string combined;
+  auto append = [&](const std::string& value) {
+    if (value.empty()) {
+      return;
+    }
+    if (!combined.empty()) {
+      combined += ' ';
+    }
+    combined += value;
+  };
+  append(query.artist);
+  append(query.album);
+  append(query.title);
+  append(query.label);
+  append(query.year);
+
+  std::ostringstream url;
+  url << "https://albumartexchange.com/covers?q="
+      << UrlEncode(curl, combined) << "&fltr=ARTISTTITLE&page=" << page;
+  return url.str();
+}
+
+std::string ExtractCoverIdFromHtml(const std::string& html, size_t& pos) {
+  const std::string searchStart = "data-coverid=\"";
+  pos = html.find(searchStart, pos);
+  if (pos == std::string::npos) {
+    return "";
+  }
+  pos += searchStart.size();
+  size_t end = html.find('"', pos);
+  if (end == std::string::npos) {
+    return "";
+  }
+  return html.substr(pos, end - pos);
+}
+
+std::string ExtractFullImageUrlFromCoverPage(CURL* curl, const std::string& coverId,
+                                              const std::string& slug) {
+  std::string detailUrl = "https://albumartexchange.com/covers/" + coverId;
+  if (!slug.empty()) {
+    detailUrl += "-" + slug;
+  }
+
+  std::string response;
+  curl_easy_setopt(curl, CURLOPT_URL, detailUrl.c_str());
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+  struct curl_slist* headers = curl_slist_append(nullptr, "User-Agent: Mozilla/5.0");
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+  const CURLcode res = curl_easy_perform(curl);
+  curl_slist_free_all(headers);
+
+  if (res != CURLE_OK || response.empty()) {
+    return "";
+  }
+
+  const std::string imgSearch = "<img src=\"/coverart/gallery/";
+  size_t imgPos = response.find(imgSearch);
+  if (imgPos == std::string::npos) {
+    return "";
+  }
+  imgPos += imgSearch.size();
+  size_t imgEnd = response.find('"', imgPos);
+  if (imgEnd == std::string::npos) {
+    return "";
+  }
+
+  std::string path = response.substr(imgPos, imgEnd - imgPos);
+  if (path.find("placeholder") != std::string::npos) {
+    return "";
+  }
+
+  return "https://albumartexchange.com/coverart/gallery/" + path;
+}
+
+std::string ExtractSlugFromDetailLink(const std::string& link) {
+  size_t slash = link.rfind('/');
+  if (slash == std::string::npos) {
+    return "";
+  }
+  std::string filename = link.substr(slash + 1);
+  size_t dash = filename.find('-');
+  if (dash == std::string::npos) {
+    return "";
+  }
+  return filename.substr(dash + 1);
+}
+
+std::vector<AlbumArtCandidate> FindMatchingAlbumArtExchangeCovers(CURL* curl,
+                                                                   const AlbumArtQuery& query,
+                                                                   size_t limit) {
+  std::vector<AlbumArtCandidate> out;
+  std::string response;
+  std::string searchUrl = BuildAlbumArtExchangeSearchUrl(curl, query, 1);
+
+  curl_easy_setopt(curl, CURLOPT_URL, searchUrl.c_str());
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+  struct curl_slist* headers = curl_slist_append(nullptr, "User-Agent: Mozilla/5.0");
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+  const CURLcode res = curl_easy_perform(curl);
+  curl_slist_free_all(headers);
+
+  if (res != CURLE_OK || response.empty()) {
+    return out;
+  }
+
+  size_t pos = 0;
+  std::unordered_set<std::string> seenIds;
+  while (out.size() < limit) {
+    std::string coverId = ExtractCoverIdFromHtml(response, pos);
+    if (coverId.empty()) {
+      break;
+    }
+    if (!seenIds.insert(coverId).second) {
+      continue;
+    }
+
+    std::string fullUrl = ExtractFullImageUrlFromCoverPage(curl, coverId, "");
+    if (fullUrl.empty()) {
+      continue;
+    }
+
+    AlbumArtCandidate c;
+    c.url = fullUrl;
+    c.artist = query.artist;
+    c.album = query.album;
+    c.label = query.label;
+    c.date = query.year;
+    c.provider_hint = "albumartexchange";
+    c.extension_hint = ".jpg";
+    out.push_back(std::move(c));
+  }
+
+  return out;
+}
+
 }  // namespace
 
 std::vector<AlbumArtCandidate> AlbumArtService::FindAlbumArt(const AlbumArtQuery& query,
@@ -316,7 +455,7 @@ std::vector<AlbumArtCandidate> AlbumArtService::FindAlbumArt(const AlbumArtQuery
         }
       }
     }
-  } else {
+  } else if (query.provider == AlbumArtProvider::Discogs) {
     const char* discogsToken = std::getenv("DISCOGS_TOKEN");
     struct curl_slist* headers = nullptr;
     if (discogsToken != nullptr && discogsToken[0] != '\0') {
@@ -394,6 +533,31 @@ std::vector<AlbumArtCandidate> AlbumArtService::FindAlbumArt(const AlbumArtQuery
 
     if (headers != nullptr) {
       curl_slist_free_all(headers);
+    }
+  } else if (query.provider == AlbumArtProvider::AlbumArtExchange) {
+    auto collectAaxAttempt = [&](const std::string& artist, const std::string& album,
+                                 const std::string& title) {
+      AlbumArtQuery attemptQuery = query;
+      attemptQuery.artist = artist;
+      attemptQuery.album = album;
+      attemptQuery.title = title;
+      auto results = FindMatchingAlbumArtExchangeCovers(curl, attemptQuery, limit);
+      for (auto& r : results) {
+        out.push_back(std::move(r));
+      }
+    };
+
+    const bool haveAlbum = !query.album.empty();
+    const bool haveTrack = !query.title.empty();
+
+    if (haveAlbum) {
+      collectAaxAttempt(query.artist, query.album, "");
+    }
+    if (out.empty() && haveTrack) {
+      collectAaxAttempt(query.artist, "", query.title);
+    }
+    if (out.empty()) {
+      collectAaxAttempt(query.artist, query.album, query.title);
     }
   }
 

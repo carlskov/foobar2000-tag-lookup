@@ -10,6 +10,7 @@ namespace taglookup {
 enum class AlbumArtProvider {
   MusicBrainz,
   Discogs,
+  AlbumArtExchange,
 };
 
 struct AlbumArtQuery {

@@ -247,6 +247,9 @@ taglookup::AlbumArtProvider LoadAlbumArtProviderSetting() {
   if (providerValue == static_cast<int>(taglookup::AlbumArtProvider::Discogs)) {
     return taglookup::AlbumArtProvider::Discogs;
   }
+  if (providerValue == static_cast<int>(taglookup::AlbumArtProvider::AlbumArtExchange)) {
+    return taglookup::AlbumArtProvider::AlbumArtExchange;
+  }
   return taglookup::AlbumArtProvider::MusicBrainz;
 }
 
