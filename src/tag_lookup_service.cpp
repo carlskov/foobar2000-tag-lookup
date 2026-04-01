@@ -155,9 +155,10 @@ std::string BuildDiscogsGeneralQuery(const LookupQuery& query) {
 }
 
 std::string BuildDiscogsUrl(CURL* curl, const LookupQuery& query, size_t limit, size_t page,
-                            SearchMode mode, bool includeTrack, bool useGeneralQuery) {
+                            SearchMode mode, bool includeTrack, bool useGeneralQuery,
+                            const char* discogsType = "master") {
   std::ostringstream url;
-  url << "https://api.discogs.com/database/search?type=master"
+  url << "https://api.discogs.com/database/search?type=" << discogsType
       << "&per_page=" << limit
       << "&page=" << page;
 
@@ -765,13 +766,13 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
     };
 
     auto collectDiscogsAttempt = [&](SearchMode attemptMode, bool includeTrack,
-                                     bool useGeneralQuery) {
+                                     bool useGeneralQuery, const char* discogsType = "master") {
       size_t page = 1;
       size_t total_pages = 1;
 
       while (page <= total_pages && out.size() < safe_limit) {
         const std::string url = BuildDiscogsUrl(curl, query, page_size, page, attemptMode,
-                                                includeTrack, useGeneralQuery);
+                                                includeTrack, useGeneralQuery, discogsType);
         nlohmann::json json;
         if (!PerformJsonRequest(curl, url, json, headers)) {
           break;
@@ -865,21 +866,35 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
     const bool haveAlbum = !query.album.empty();
     const bool haveTrack = !query.title.empty();
 
-    collectDiscogsAttempt(mode, !haveAlbum && haveTrack, false);
-    if (out.empty() && haveTrack) {
-      collectDiscogsAttempt(mode, false, false);
-    }
-    if (out.empty()) {
-      collectDiscogsAttempt(mode, false, true);
-    }
-    if (out.empty() && mode == SearchMode::ExactPhrase) {
-        collectDiscogsAttempt(SearchMode::Tokenized, !haveAlbum && haveTrack, false);
+    const bool doExactPhrase = (mode == SearchMode::ExactPhrase);
+
+    auto tryDiscogsType = [&](const char* discogsType) {
+      collectDiscogsAttempt(mode, !haveAlbum && haveTrack, false, discogsType);
+      if (out.size() >= safe_limit) return true;
+      if (out.empty() && haveTrack) {
+        collectDiscogsAttempt(mode, false, false, discogsType);
+      }
+      if (out.size() >= safe_limit) return true;
+      if (out.empty()) {
+        collectDiscogsAttempt(mode, false, true, discogsType);
+      }
+      if (out.size() >= safe_limit) return true;
+      if (doExactPhrase) {
+        collectDiscogsAttempt(SearchMode::Tokenized, !haveAlbum && haveTrack, false, discogsType);
+        if (out.size() >= safe_limit) return true;
         if (out.empty() && haveTrack) {
-          collectDiscogsAttempt(SearchMode::Tokenized, false, false);
+          collectDiscogsAttempt(SearchMode::Tokenized, false, false, discogsType);
         }
+        if (out.size() >= safe_limit) return true;
         if (out.empty()) {
-          collectDiscogsAttempt(SearchMode::Tokenized, false, true);
+          collectDiscogsAttempt(SearchMode::Tokenized, false, true, discogsType);
         }
+      }
+      return out.size() >= safe_limit;
+    };
+
+    if (!tryDiscogsType("master") && out.empty()) {
+      tryDiscogsType("release");
     }
 
     if (headers != nullptr) {

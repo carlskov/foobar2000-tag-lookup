@@ -123,9 +123,10 @@ std::string BuildMusicBrainzUrl(CURL* curl, const AlbumArtQuery& query, size_t l
 }
 
 std::string BuildDiscogsSearchUrl(CURL* curl, const AlbumArtQuery& query, size_t limit,
-                                  SearchMode mode, bool includeTrack, bool useGeneralQuery) {
+                                  SearchMode mode, bool includeTrack, bool useGeneralQuery,
+                                  const char* discogsType = "master") {
   std::ostringstream url;
-  url << "https://api.discogs.com/database/search?type=master&per_page=" << limit << "&page=1";
+  url << "https://api.discogs.com/database/search?type=" << discogsType << "&per_page=" << limit << "&page=1";
 
   auto appendParam = [&](const char* key, const std::string& value, bool quoted) {
     if (value.empty()) {
@@ -463,12 +464,13 @@ std::vector<AlbumArtCandidate> AlbumArtService::FindAlbumArt(const AlbumArtQuery
       headers = curl_slist_append(headers, auth.c_str());
     }
 
-    auto collectAttempt = [&](SearchMode attemptMode, bool includeTrack, bool useGeneralQuery) {
+    auto collectAttempt = [&](SearchMode attemptMode, bool includeTrack, bool useGeneralQuery,
+                              const char* discogsType = "master") {
       nlohmann::json payload;
       if (!(PerformJsonRequest(
                 curl,
                 BuildDiscogsSearchUrl(curl, query, limit, attemptMode, includeTrack,
-                                      useGeneralQuery),
+                                      useGeneralQuery, discogsType),
                 payload, headers) &&
             payload.contains("results") && payload["results"].is_array())) {
         return;
@@ -512,23 +514,33 @@ std::vector<AlbumArtCandidate> AlbumArtService::FindAlbumArt(const AlbumArtQuery
       }
     };
 
-    const bool haveAlbum = !query.album.empty();
-    const bool haveTrack = !query.title.empty();
-    collectAttempt(query.search_mode, !haveAlbum && haveTrack, false);
-    if (out.empty() && haveTrack) {
-      collectAttempt(query.search_mode, false, false);
-    }
-    if (out.empty()) {
-      collectAttempt(query.search_mode, false, true);
-    }
-    if (out.empty() && query.search_mode == SearchMode::ExactPhrase) {
-        collectAttempt(SearchMode::Tokenized, !haveAlbum && haveTrack, false);
-        if (out.empty() && haveTrack) {
-          collectAttempt(SearchMode::Tokenized, false, false);
+    auto tryDiscogsType = [&](const char* discogsType) {
+      collectAttempt(query.search_mode, !query.album.empty() ? false : !query.title.empty(), false, discogsType);
+      if (out.size() >= limit) return true;
+      if (out.empty() && !query.title.empty()) {
+        collectAttempt(query.search_mode, false, false, discogsType);
+      }
+      if (out.size() >= limit) return true;
+      if (out.empty()) {
+        collectAttempt(query.search_mode, false, true, discogsType);
+      }
+      if (out.size() >= limit) return true;
+      if (query.search_mode == SearchMode::ExactPhrase) {
+        collectAttempt(SearchMode::Tokenized, !query.album.empty() ? false : !query.title.empty(), false, discogsType);
+        if (out.size() >= limit) return true;
+        if (out.empty() && !query.title.empty()) {
+          collectAttempt(SearchMode::Tokenized, false, false, discogsType);
         }
+        if (out.size() >= limit) return true;
         if (out.empty()) {
-          collectAttempt(SearchMode::Tokenized, false, true);
+          collectAttempt(SearchMode::Tokenized, false, true, discogsType);
         }
+      }
+      return out.size() >= limit;
+    };
+
+    if (!tryDiscogsType("master") && out.empty()) {
+      tryDiscogsType("release");
     }
 
     if (headers != nullptr) {

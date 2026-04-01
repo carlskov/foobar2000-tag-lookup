@@ -69,7 +69,8 @@ std::optional<QueryPromptResult> RunQueryPrompt(NSString* messageText,
                                                 SearchMode searchMode,
                                                 bool showOverwriteTitle,
                                                 bool overwriteTitle,
-                                                const std::string& statusMessage) {
+                                                const std::string& statusMessage,
+                                                bool showAlbumArtExchange) {
   NSAlert* alert = [[NSAlert alloc] init];
   alert.messageText = messageText;
   alert.informativeText = informativeText;
@@ -84,7 +85,12 @@ std::optional<QueryPromptResult> RunQueryPrompt(NSString* messageText,
                                  pullsDown:NO];
   [providerPopup addItemWithTitle:@"MusicBrainz"];
   [providerPopup addItemWithTitle:@"Discogs"];
-  [providerPopup addItemWithTitle:@"AlbumArtExchange"];
+  if (showAlbumArtExchange) {
+    [providerPopup addItemWithTitle:@"AlbumArtExchange"];
+  }
+  if (providerIndex >= [providerPopup numberOfItems]) {
+    providerIndex = 0;
+  }
   [providerPopup selectItemAtIndex:providerIndex];
 
   NSTextField* artistInput = MakeInput(ToNSString(artist), 220);
@@ -178,7 +184,8 @@ std::optional<LookupQuery> PromptForLookupQuery(const LookupQuery& seed,
                                        seed.search_mode,
                                        true,
                                        seed.overwrite_title_on_propagation,
-                                       statusMessage);
+                                       statusMessage,
+                                       false);
     if (!result.has_value()) {
       return std::nullopt;
     }
@@ -203,7 +210,7 @@ std::optional<AlbumArtQuery> PromptForAlbumArtQuery(const AlbumArtQuery& seed,
   @autoreleasepool {
     const auto result = RunQueryPrompt(@"Album Art Query",
                                        @"Fill any fields. Results must match the provider query you provide.",
-                                       (seed.provider == AlbumArtProvider::Discogs) ? 1 : 0,
+                                       (seed.provider == AlbumArtProvider::Discogs) ? 1 : (seed.provider == AlbumArtProvider::AlbumArtExchange) ? 2 : 0,
                                        seed.artist,
                                        seed.album,
                                        seed.label,
@@ -212,7 +219,8 @@ std::optional<AlbumArtQuery> PromptForAlbumArtQuery(const AlbumArtQuery& seed,
                                        seed.search_mode,
                                        false,
                                        false,
-                                       statusMessage);
+                                       statusMessage,
+                                       true);
     if (!result.has_value()) {
       return std::nullopt;
     }
