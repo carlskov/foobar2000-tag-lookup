@@ -311,6 +311,184 @@ void TestGuessExtensionDerivesFromUrl() {
          "GuessExtension should derive extension from URL");
 }
 
+// ---------------------------------------------------------------------------
+// BuildAlbumArtExchangeSearchUrl
+// ---------------------------------------------------------------------------
+
+void TestBuildAlbumArtExchangeSearchUrlIncludesArtistAndAlbum() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+
+  const std::string url = taglookup::BuildAlbumArtExchangeSearchUrl(curl, query, 1);
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("albumartexchange.com") != std::string::npos,
+         "URL should target AlbumArtExchange");
+  Expect(url.find("q=Radiohead%20OK%20Computer") != std::string::npos,
+         "URL should include artist and album query");
+  Expect(url.find("fltr=ARTISTTITLE") != std::string::npos,
+         "URL should include ARTISTTITLE filter");
+  Expect(url.find("page=1") != std::string::npos,
+         "URL should include page parameter");
+}
+
+void TestBuildAlbumArtExchangeSearchUrlHandlesMultipleFields() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+  query.title = "Paranoid Android";
+  query.label = "Parlophone";
+  query.year = "1997";
+
+  const std::string url = taglookup::BuildAlbumArtExchangeSearchUrl(curl, query, 2);
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("Radiohead") != std::string::npos,
+         "URL should include artist");
+  Expect(url.find("OK%20Computer") != std::string::npos,
+         "URL should include album");
+  Expect(url.find("Paranoid%20Android") != std::string::npos,
+         "URL should include title");
+  Expect(url.find("page=2") != std::string::npos,
+         "URL should include page 2");
+}
+
+void TestBuildAlbumArtExchangeSearchUrlHandlesEmptyFields() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+
+  const std::string url = taglookup::BuildAlbumArtExchangeSearchUrl(curl, query, 1);
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("q=Radiohead") != std::string::npos,
+         "URL should include only the non-empty artist field");
+}
+
+// ---------------------------------------------------------------------------
+// ExtractCoverIdFromHtml
+// ---------------------------------------------------------------------------
+
+void TestExtractCoverIdFromHtmlFindsDataCoverId() {
+  const std::string html = R"html(
+    <div class="cover-item">
+      <a href="/covers/12345-slug-name">Cover</a>
+    </div>
+  )html";
+  size_t pos = 0;
+  std::string coverId = taglookup::ExtractCoverIdFromHtml(html, pos);
+  Expect(coverId == "12345",
+         "ExtractCoverIdFromHtml should find cover ID");
+}
+
+void TestExtractCoverIdFromHtmlReturnsEmptyWhenNotFound() {
+  const std::string html = "<div>No cover IDs here</div>";
+  size_t pos = 0;
+  std::string coverId = taglookup::ExtractCoverIdFromHtml(html, pos);
+  Expect(coverId.empty(),
+         "ExtractCoverIdFromHtml should return empty when no cover ID found");
+}
+
+void TestExtractCoverIdFromHtmlAdvancesPosition() {
+  const std::string html = "data-coverid=\"abc\" more data-coverid=\"xyz\"";
+  size_t pos = 0;
+  std::string firstId = taglookup::ExtractCoverIdFromHtml(html, pos);
+  Expect(firstId == "abc",
+         "First cover ID should be 'abc'");
+  std::string secondId = taglookup::ExtractCoverIdFromHtml(html, pos);
+  Expect(secondId == "xyz",
+         "Second call should find 'xyz' (position advanced)");
+}
+
+// ---------------------------------------------------------------------------
+// ExtractSlugFromDetailLink
+// ---------------------------------------------------------------------------
+
+void TestExtractSlugFromDetailLinkExtractsSlug() {
+  Expect(taglookup::ExtractSlugFromDetailLink("/covers/123-slug-name") == "slug-name",
+         "Should extract slug after dash from detail link");
+  Expect(taglookup::ExtractSlugFromDetailLink("/covers/456-another-slug") == "another-slug",
+         "Should handle longer slugs");
+}
+
+void TestExtractSlugFromDetailLinkReturnsEmptyForInvalidLinks() {
+  Expect(taglookup::ExtractSlugFromDetailLink("").empty(),
+         "Should return empty for empty string");
+  Expect(taglookup::ExtractSlugFromDetailLink("/no-dash-here").empty(),
+         "Should return empty for links without dash separator");
+  Expect(taglookup::ExtractSlugFromDetailLink("not-a-path").empty(),
+         "Should return empty for paths without slash");
+}
+
+// ---------------------------------------------------------------------------
+// BuildDiscogsSearchUrl with discogsType parameter
+// ---------------------------------------------------------------------------
+
+void TestBuildDiscogsSearchUrlUsesMasterTypeByDefault() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+
+  const std::string url = taglookup::BuildDiscogsSearchUrl(
+      curl, query, 10, taglookup::SearchMode::ExactPhrase, false, false);
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("type=master") != std::string::npos,
+         "Default Discogs search should use type=master");
+}
+
+void TestBuildDiscogsSearchUrlAcceptsReleaseType() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+
+  const std::string url = taglookup::BuildDiscogsSearchUrl(
+      curl, query, 10, taglookup::SearchMode::ExactPhrase, false, false, "release");
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("type=release") != std::string::npos,
+         "Discogs search with discogsType='release' should use type=release");
+}
+
+void TestBuildDiscogsSearchUrlWithReleaseTypeIncludesAllFields() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::AlbumArtQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+  query.label = "Parlophone";
+  query.year = "1997";
+
+  const std::string url = taglookup::BuildDiscogsSearchUrl(
+      curl, query, 10, taglookup::SearchMode::ExactPhrase, false, false, "release");
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("artist=Radiohead") != std::string::npos,
+         "URL should include artist");
+  Expect(url.find("release_title=OK%20Computer") != std::string::npos,
+         "URL should include album as release_title");
+  Expect(url.find("label=Parlophone") != std::string::npos,
+         "URL should include label");
+  Expect(url.find("year=1997") != std::string::npos,
+         "URL should include year");
+}
+
 }  // namespace
 
 int main() {
@@ -339,6 +517,25 @@ int main() {
     TestGuessExtensionUsesExtensionHint();
     TestGuessExtensionDerivesFromContentType();
     TestGuessExtensionDerivesFromUrl();
+
+    // BuildAlbumArtExchangeSearchUrl
+    TestBuildAlbumArtExchangeSearchUrlIncludesArtistAndAlbum();
+    TestBuildAlbumArtExchangeSearchUrlHandlesMultipleFields();
+    TestBuildAlbumArtExchangeSearchUrlHandlesEmptyFields();
+
+    // ExtractCoverIdFromHtml
+    TestExtractCoverIdFromHtmlFindsDataCoverId();
+    TestExtractCoverIdFromHtmlReturnsEmptyWhenNotFound();
+    TestExtractCoverIdFromHtmlAdvancesPosition();
+
+    // ExtractSlugFromDetailLink
+    TestExtractSlugFromDetailLinkExtractsSlug();
+    TestExtractSlugFromDetailLinkReturnsEmptyForInvalidLinks();
+
+    // BuildDiscogsSearchUrl with discogsType parameter
+    TestBuildDiscogsSearchUrlUsesMasterTypeByDefault();
+    TestBuildDiscogsSearchUrlAcceptsReleaseType();
+    TestBuildDiscogsSearchUrlWithReleaseTypeIncludesAllFields();
   } catch (const std::exception& e) {
     std::cerr << e.what() << '\n';
     curl_global_cleanup();

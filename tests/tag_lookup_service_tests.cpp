@@ -779,6 +779,66 @@ void TestResolveDiscogsTrackArtistFallsBackToProvidedFallback() {
          "Should use the provided fallback when no release or track artist is present");
 }
 
+// ---------------------------------------------------------------------------
+// BuildDiscogsUrl with discogsType parameter
+// ---------------------------------------------------------------------------
+
+void TestBuildDiscogsUrlUsesMasterTypeByDefault() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::LookupQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+
+  const std::string url = taglookup::BuildDiscogsUrl(
+      curl, query, 10, 1, taglookup::SearchMode::ExactPhrase, false, false);
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("type=master") != std::string::npos,
+         "Default Discogs lookup should use type=master");
+}
+
+void TestBuildDiscogsUrlAcceptsReleaseType() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::LookupQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+
+  const std::string url = taglookup::BuildDiscogsUrl(
+      curl, query, 10, 1, taglookup::SearchMode::ExactPhrase, false, false, "release");
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("type=release") != std::string::npos,
+         "Discogs lookup with discogsType='release' should use type=release");
+}
+
+void TestBuildDiscogsUrlWithReleaseTypeIncludesAllFields() {
+  CURL* curl = curl_easy_init();
+  Expect(curl != nullptr, "curl_easy_init failed");
+
+  taglookup::LookupQuery query;
+  query.artist = "Radiohead";
+  query.album = "OK Computer";
+  query.label = "Parlophone";
+  query.year = "1997";
+
+  const std::string url = taglookup::BuildDiscogsUrl(
+      curl, query, 10, 1, taglookup::SearchMode::ExactPhrase, false, false, "release");
+  curl_easy_cleanup(curl);
+
+  Expect(url.find("artist=Radiohead") != std::string::npos,
+         "URL should include artist");
+  Expect(url.find("release_title=OK%20Computer") != std::string::npos,
+         "URL should include album as release_title");
+  Expect(url.find("label=Parlophone") != std::string::npos,
+         "URL should include label");
+  Expect(url.find("year=1997") != std::string::npos,
+         "URL should include year");
+}
+
 }  // namespace
 
 int main() {
@@ -789,6 +849,11 @@ int main() {
     TestDiscogsGeneralQueryIncludesAllFilledFields();
     TestMatchesFilledFieldsRequiresAllProvidedFields();
     TestExtractDiscogsMasterCoverUrlPrefersUri150ForPreviews();
+
+    // BuildDiscogsUrl with discogsType parameter
+    TestBuildDiscogsUrlUsesMasterTypeByDefault();
+    TestBuildDiscogsUrlAcceptsReleaseType();
+    TestBuildDiscogsUrlWithReleaseTypeIncludesAllFields();
 
     // JsonToString
     TestJsonToStringConvertsVariousTypes();
