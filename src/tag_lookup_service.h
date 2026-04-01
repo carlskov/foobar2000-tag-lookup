@@ -36,6 +36,7 @@ struct TagResult {
   std::string recording_id;
   std::string master_id;
   std::string release_id;
+  std::string release_type;
   int score = 0;
 };
 

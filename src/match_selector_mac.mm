@@ -97,8 +97,10 @@ NSString* BuildItemLabel(const TagResult& item) {
   NSString* album = item.album.empty() ? @"Unknown album" : ToNSString(item.album);
   NSString* label = item.label.empty() ? @"Unknown label" : ToNSString(item.label);
   NSString* date = item.date.empty() ? @"Unknown date" : ToNSString(item.date);
-  return [NSString stringWithFormat:@"%@ - %@ | %@ | %@ (%@) [score %d]", artist, title, album,
-                                    label, date, item.score];
+  NSString* releaseType = item.release_type.empty() ? @"" : [NSString stringWithFormat:@" [%@]",
+                                                             ToNSString(item.release_type)];
+  return [NSString stringWithFormat:@"%@ - %@ | %@ | %@ (%@)%@ [score %d]", artist, title, album,
+                                    label, date, releaseType, item.score];
 }
 
 }  // namespace

@@ -797,6 +797,7 @@ std::vector<TagResult> TagLookupService::LookupAll(const LookupQuery& query, siz
         for (const auto& result : json["results"]) {
         TagResult item;
         const std::string resultType = ToLower(JsonFieldToString(result, "type"));
+        item.release_type = resultType;
         if (resultType == "master") {
           item.master_id = JsonFieldToString(result, "id");
         } else {
