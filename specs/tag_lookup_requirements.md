@@ -2,17 +2,58 @@
 
 ## Functional Requirements
 
-### FR-001: Discogs API Integration
-- **Description**: Must query Discogs API for release metadata
-- **Input**: Album artist, album title, optional release year
-- **Output**: Structured tracklist with metadata
-- **Success Criteria**: Returns valid JSON with ≥80% field coverage
+### FR-001: Multi-Field Search Interface
+- **Description**: Must support flexible search using multiple metadata fields
+- **Input Fields**:
+  - artist (string, optional)
+  - album (string, optional) 
+  - label (string, optional)
+  - title (string, optional)
+  - year (string, optional)
+  - search_mode (enum: ExactPhrase, AllWords, AnyWords)
+  - provider (enum: MusicBrainz, Discogs)
+- **Validation**: At least one field must be non-empty
+- **Output**: Vector of TagResult matches (up to configurable limit)
 
-### FR-002: MusicBrainz API Integration
-- **Description**: Must query MusicBrainz API for release metadata
-- **Input**: Album artist, album title, release ID
-- **Output**: Structured tracklist with artist credits and recordings
-- **Success Criteria**: Returns valid JSON with artist credits and recording data
+### FR-002: MusicBrainz Search API
+- **Description**: Must search MusicBrainz database using multiple fields
+- **Endpoint**: `https://musicbrainz.org/ws/2/release/`
+- **Query Parameters**:
+  - artist: Exact or partial match
+  - release: Album title match
+  - label: Label name match
+  - recording: Track title match (if provided)
+  - date: Year match (if provided)
+- **Search Modes**:
+  - ExactPhrase: Full phrase matching
+  - AllWords: All words must match
+  - AnyWords: Any word may match
+- **Pagination**: 100 results per page, multiple pages as needed
+- **Output**: Vector of TagResult with score, release ID, and basic metadata
+
+### FR-003: Discogs Search API
+- **Description**: Must search Discogs database with master release priority
+- **Endpoint**: `https://api.discogs.com/database/search`
+- **Search Strategy**:
+  1. **Primary Search**: Master releases first (`type:master`)
+  2. **Fallback Search**: Specific releases if master search yields no results
+  3. **Track-Level Search**: If title provided, search with track information
+- **Query Parameters**:
+  - artist: Artist name
+  - release_title: Album title
+  - label: Label name
+  - track: Track title (when provided)
+  - year: Release year
+  - type: "master" for primary search, omitted for fallback
+- **Pagination**: Configurable page size, multiple pages as needed
+- **Master Release Resolution**:
+  - When master ID found, fetch master release JSON
+  - Extract main release ID from master
+  - Use master cover art as fallback
+- **Result Processing**:
+  - Parse "Artist - Album" format from title field
+  - Extract release type (master vs specific)
+  - Handle both master_id and release_id appropriately
 
 ### FR-003: Credit Extraction
 - **Description**: Must extract composer and performer credits from track data
@@ -24,17 +65,29 @@
   - Returns empty string when no matches
   - Case-insensitive role matching
 
-### FR-004: Error Handling
-- **Description**: Must handle API failures gracefully
-- **Triggers**: Network errors, rate limiting, invalid responses
-- **Behavior**: Return empty results with error logging
-- **Recovery**: Implement exponential backoff for rate limits
+### FR-004: Search Result Processing
+- **Description**: Must process and filter search results
+- **Features**:
+  - Deduplication: Remove duplicate releases
+  - Scoring: Assign relevance scores based on match quality
+  - Limiting: Respect user-specified result limit (max 50)
+  - Track Matching: For track-level searches, find matching track titles
+- **Track Matching Logic**:
+  - When title field provided, search recordings/tracks
+  - Return only releases containing matching track
+  - Extract exact track title from release data
 
-### FR-005: Provider Fallback
-- **Description**: Must support fallback between Discogs and MusicBrainz
-- **Priority**: User-configurable provider order
-- **Behavior**: Automatic fallback on API failure
-- **Configuration**: Persistent provider preference
+### FR-005: Error Handling
+- **Description**: Must handle API failures gracefully
+- **Triggers**: Network errors, rate limiting, invalid responses, empty results
+- **Behavior**: 
+  - Return empty vector on failure
+  - Log errors to console/stderr
+  - No exceptions thrown to callers
+- **Validation**:
+  - Check for empty input fields
+  - Validate JSON response structure
+  - Handle missing or null fields gracefully
 
 ## Non-Functional Requirements
 
@@ -97,14 +150,14 @@ optional fields:
 ## Test Coverage Requirements
 
 ### Unit Tests (100% coverage required)
-- `ExtractDiscogsTrackCredits()` - all role matching scenarios
+- Discogs master release fallback logic
 - JSON parsing edge cases (null, empty, malformed)
 - Unicode handling in metadata fields
-- MusicBrainz artist credit parsing
+- MusicBrainz artist credit parsing from release JSON
 - MusicBrainz recording data extraction
 
 ### Integration Tests (95% coverage required)
 - Full API request/response cycle (Discogs and MusicBrainz)
 - Rate limiting behavior for both APIs
 - Error condition handling
-- Fallback between Discogs and MusicBrainz
+- Discogs master release fallback scenarios

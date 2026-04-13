@@ -25,29 +25,15 @@ The Album Art Service provides functionality to search for and download album ar
 - **Output**: Raw image bytes and content type
 - **Success Criteria**: Valid image data with correct content type
 
-### FR-004: Provider-Specific Search
-- **Description**: Must implement provider-specific search logic
-
-#### MusicBrainz Requirements
-- **Endpoint**: Cover Art Archive API
-- **Query Parameters**: Release MBID or artist/album search
-- **Response Handling**: Parse image list from JSON
+### FR-004: MusicBrainz Cover Art Archive Integration
+- **Description**: Must fetch album art from MusicBrainz Cover Art Archive
+- **Endpoint**: `https://coverartarchive.org/release/{mbid}`
+- **Input**: MusicBrainz Release ID
+- **Output**: Vector of image URLs with type information
 - **Image Types**: Front, back, booklet
-- **Size Preferences**: 500px, 250px, or thumbnail
-
-#### Discogs Requirements
-- **Endpoint**: Discogs API release endpoint
-- **Query Parameters**: Artist, album, release ID
-- **Response Handling**: Extract image URLs from release data
-- **Image Types**: Primary, secondary images
-- **Authentication**: Require user token for full access
-
-#### AlbumArtExchange Requirements
-- **Endpoint**: AlbumArtExchange API
-- **Query Parameters**: Artist, album
-- **Response Handling**: Parse direct image URLs
-- **Image Format**: JPEG only
-- **Fallback**: Use thumbnail if full-size unavailable
+- **Size Preferences**: 500px preferred, fallback to 250px or thumbnail
+- **Authentication**: None required
+- **Rate Limit**: 50 requests/second
 
 ### FR-005: Result Ranking
 - **Description**: Must rank search results by relevance
